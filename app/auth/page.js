@@ -53,7 +53,11 @@ export default function AuthPage() {
         if (!res.ok) throw new Error(data.message || "Something went wrong");
         
         localStorage.setItem("token", data.token);
-        router.push("/dashboard");
+        if (data.user && !data.user.onboardingComplete) {
+          router.push("/onboarding");
+        } else {
+          router.push("/dashboard");
+        }
 
       } else {
         if (authMethod === "code") {
@@ -73,7 +77,11 @@ export default function AuthPage() {
         if (!res.ok) throw new Error(data.message || "Something went wrong");
         
         localStorage.setItem("token", data.token);
-        router.push("/dashboard");
+        if (data.user && !data.user.onboardingComplete) {
+          router.push("/onboarding");
+        } else {
+          router.push("/dashboard");
+        }
       }
     } catch (err) {
       setError(err.message);
