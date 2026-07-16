@@ -20,7 +20,7 @@ export default function Home() {
         </p>
         
         <div className="pt-8 flex justify-center">
-          <Link href="/onboarding">
+          <Link href="/auth">
             <button className="primary-button flex items-center gap-2 px-8 py-4 rounded-xl text-lg font-medium">
               Get Started
               <ArrowRight className="w-5 h-5" />

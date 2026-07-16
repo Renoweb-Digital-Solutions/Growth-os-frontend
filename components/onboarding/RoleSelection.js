@@ -3,6 +3,8 @@
 import { User, Building2 } from "lucide-react";
 import { motion } from "framer-motion";
 
+// Reason: First step in the onboarding flow to segment users into different operational paths.
+// How: Presents two distinct paths (Client vs Agency). Triggers the `onSelect` callback passed from the parent page with the selected role identifier.
 export default function RoleSelection({ onSelect }) {
   return (
     <div className="glass-panel p-10 md:p-14 rounded-3xl w-full mx-auto card-shadow max-w-2xl text-center">

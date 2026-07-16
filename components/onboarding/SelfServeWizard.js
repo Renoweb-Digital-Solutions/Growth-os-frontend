@@ -5,6 +5,8 @@ import { ArrowLeft, ArrowRight, Building, Palette, CreditCard, Send, CheckCircle
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 
+// Reason: Provides a step-by-step setup process for new B2B users, minimizing cognitive load by breaking configuration into logical chunks.
+// How: Uses a local 'step' state to render different motion.div panels. It collects state in 'formData' and submits everything at the end.
 export default function SelfServeWizard({ onBack }) {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -22,6 +24,8 @@ export default function SelfServeWizard({ onBack }) {
   const nextStep = () => setStep(s => s + 1);
   const prevStep = () => step === 1 ? onBack() : setStep(s => s - 1);
 
+  // Reason: Allows users to quickly preview potential branding without manual color picking.
+  // How: Generates three random hex colors and updates the brandColors array in the formData state.
   const randomizeColors = () => {
     const randomColor = () => "#" + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
     setFormData({ ...formData, brandColors: [randomColor(), randomColor(), randomColor()] });
@@ -37,6 +41,8 @@ export default function SelfServeWizard({ onBack }) {
     setFormData({ ...formData, brandColors: newColors });
   };
 
+  // Reason: Finalizes the wizard by handling the submission based on the selected plan tier.
+  // How: Simulates a network delay. If the tier is 'enterprise', it transitions to a specialized lead-capture state. Otherwise, it redirects to the dashboard.
   const handleFinish = async () => {
     setIsSubmitting(true);
     // Simulate API delay

@@ -1,28 +1,54 @@
-import { BarChart3, Home as HomeIcon } from "lucide-react";
-import Link from "next/link";
+"use client";
 
+import { BarChart3, Home as HomeIcon, LogOut } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+// Reason: Provide users a central hub after authenticating, serving as the shell for the application.
+// How: This is currently a layout shell. In the future, it will fetch data using the JWT stored in localStorage.
 export default function DashboardPage() {
+  const router = useRouter();
+
+  // Reason: Allows users to securely end their session and prevent unauthorized access on shared devices.
+  // How: Removes the JWT token from localStorage and redirects the user back to the unified /auth screen.
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    router.push("/auth");
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {/* Sidebar Placeholder */}
-      <div className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col p-6">
-        <div className="flex items-center text-xl font-bold text-slate-900 mb-10">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
-            <span className="text-white text-sm">G</span>
+      <div className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col p-6 justify-between">
+        <div>
+          <div className="flex items-center text-xl font-bold text-slate-900 mb-10">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+              <span className="text-white text-sm">G</span>
+            </div>
+            GrowthOS
           </div>
-          GrowthOS
+          
+          <nav className="space-y-2">
+            <Link href="/dashboard" className="flex items-center px-4 py-3 bg-blue-50 text-blue-700 rounded-xl font-medium">
+              <HomeIcon className="w-5 h-5 mr-3" />
+              Overview
+            </Link>
+            <div className="flex items-center px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-xl font-medium cursor-not-allowed">
+              <BarChart3 className="w-5 h-5 mr-3" />
+              Reports (Coming Soon)
+            </div>
+          </nav>
         </div>
-        
-        <nav className="space-y-2">
-          <Link href="/dashboard" className="flex items-center px-4 py-3 bg-blue-50 text-blue-700 rounded-xl font-medium">
-            <HomeIcon className="w-5 h-5 mr-3" />
-            Overview
-          </Link>
-          <div className="flex items-center px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-xl font-medium cursor-not-allowed">
-            <BarChart3 className="w-5 h-5 mr-3" />
-            Reports (Coming Soon)
-          </div>
-        </nav>
+
+        <div>
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center px-4 py-3 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-xl font-medium transition-colors"
+          >
+            <LogOut className="w-5 h-5 mr-3" />
+            Sign Out
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}

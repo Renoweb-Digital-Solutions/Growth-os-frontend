@@ -5,11 +5,15 @@ import { ArrowLeft, CheckCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 
+// Reason: The B2C onboarding flow requires capturing user credentials and confirming pending invites without overwhelming the user.
+// How: Implements a multi-step form within a single component. State 'step' controls which form segment is rendered, using framer-motion for transitions.
 export default function B2CFlow({ onBack }) {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({ name: "", email: "", password: "" });
 
+  // Reason: Handle local state transitions before finalizing the submission to the backend.
+  // How: Validates the current step, advances the UI state if not on the final step, and performs the API redirect logic when complete.
   const handleNext = (e) => {
     e.preventDefault();
     if (step === 1) setStep(2);

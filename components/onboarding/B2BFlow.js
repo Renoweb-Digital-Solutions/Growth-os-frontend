@@ -5,12 +5,16 @@ import { ArrowLeft, Key, Rocket } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import SelfServeWizard from "./SelfServeWizard";
 
+// Reason: Provide a tailored onboarding experience for agencies (B2B), differentiating between invited users and self-serve signups.
+// How: Maintains a local state machine ('initial', 'invite_entry', 'self_serve') to conditionally render the relevant form or wizard component without page reloads.
 export default function B2BFlow({ onBack }) {
   // 'initial', 'invite_entry', 'self_serve'
   const [step, setStep] = useState("initial");
   const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState("");
 
+  // Reason: Pre-validate invite codes on the client side before hitting the backend to provide immediate feedback.
+  // How: Checks if the invite code length is adequate. In a full implementation, this triggers a backend verification request.
   const handleInviteSubmit = (e) => {
     e.preventDefault();
     if (inviteCode.length > 3) {
@@ -104,6 +108,8 @@ export default function B2BFlow({ onBack }) {
 
         {step === "self_serve" && (
           <motion.div key="self_serve" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+            {/* Reason: Offload the complex multi-step self-serve flow to a dedicated component for maintainability. */}
+            {/* How: Renders the SelfServeWizard and passes a callback to allow users to navigate back to the initial B2B selection step. */}
             <SelfServeWizard onBack={() => setStep("initial")} />
           </motion.div>
         )}
