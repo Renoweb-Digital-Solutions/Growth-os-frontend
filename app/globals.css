@@ -116,3 +116,67 @@ body {
   -webkit-mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
   mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
 }
+
+/* ======================================
+   Dashboard-specific styles
+   ====================================== */
+
+/* Standard dashboard card — white bg, soft radius, subtle shadow */
+.dashboard-card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 4px 12px rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  transition: box-shadow 0.3s ease;
+}
+
+.dashboard-card:hover {
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.06),
+    0 8px 24px rgba(0, 0, 0, 0.04);
+}
+
+/* AI Insight gradient card — purple-to-blue with shimmer */
+.ai-gradient-card {
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 40%, #3B82F6 100%);
+  border-radius: 16px;
+  box-shadow:
+    0 4px 20px rgba(99, 102, 241, 0.25),
+    0 8px 32px rgba(139, 92, 246, 0.15);
+}
+
+/* Hide scrollbar utility (used in PipelineStrip horizontal scroll) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Card entrance animation */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+
+/* Delay utility classes for staggered card animations */
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+.delay-1000 { animation-delay: 1000ms; }

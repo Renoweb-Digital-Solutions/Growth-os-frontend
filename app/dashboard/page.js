@@ -1,80 +1,58 @@
 "use client";
 
-import { BarChart3, Home as HomeIcon, LogOut } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+// Reason: This is the main dashboard HOME page that assembles all widget components
+//         into a responsive grid layout. The Sidebar is now provided by layout.js.
+// How: Renders the Header (greeting + filters) and all dashboard widgets in a
+//      CSS Grid layout (12-column on desktop).
 
-// Reason: Provide users a central hub after authenticating, serving as the shell for the application.
-// How: This is currently a layout shell. In the future, it will fetch data using the JWT stored in localStorage.
+// Central State: No central state management yet — each component reads from mockData.js.
+// Data Flow: All data flows from mockData.js → individual components. No inter-component
+//            data passing in this initial build.
+
+// Component imports from frontend/components/dashboard/
+import Header from "@/components/dashboard/Header";
+import ForecastChart from "@/components/dashboard/ForecastChart";
+import AIInsightCard from "@/components/dashboard/AIInsightCard";
+import HealthScoreCard from "@/components/dashboard/HealthScoreCard";
+import LeadSourceCard from "@/components/dashboard/LeadSourceCard";
+import ActivityFeed from "@/components/dashboard/ActivityFeed";
+import PerformanceCard from "@/components/dashboard/PerformanceCard";
+import PipelineStrip from "@/components/dashboard/PipelineStrip";
+import CampaignCards from "@/components/dashboard/CampaignCards";
+
 export default function DashboardPage() {
-  const router = useRouter();
-
-  // Reason: Allows users to securely end their session and prevent unauthorized access on shared devices.
-  // How: Removes the JWT token from localStorage and redirects the user back to the unified /auth screen.
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    router.push("/auth");
-  };
-
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      {/* Sidebar Placeholder */}
-      <div className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col p-6 justify-between">
-        <div>
-          <div className="flex items-center text-xl font-bold text-slate-900 mb-10">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
-              <span className="text-white text-sm">G</span>
-            </div>
-            GrowthOS
-          </div>
-          
-          <nav className="space-y-2">
-            <Link href="/dashboard" className="flex items-center px-4 py-3 bg-blue-50 text-blue-700 rounded-xl font-medium">
-              <HomeIcon className="w-5 h-5 mr-3" />
-              Overview
-            </Link>
-            <div className="flex items-center px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-xl font-medium cursor-not-allowed">
-              <BarChart3 className="w-5 h-5 mr-3" />
-              Reports (Coming Soon)
-            </div>
-          </nav>
+    <>
+      {/* Header with search, greeting, filters */}
+      {/* Receives: nothing. Internally reads userProfile from JWT. */}
+      <Header />
+
+      {/* Dashboard widget grid — 12-column layout */}
+      <div className="grid grid-cols-12 gap-5">
+        {/* Row 1: Forecast chart (8 cols) + AI Insight (4 cols) */}
+        <ForecastChart />
+        <AIInsightCard />
+
+        {/* Row 2: Lead Source (4 cols) + Activity Feed (4 cols) + Performance (4 cols) */}
+        <div className="col-span-full lg:col-span-4">
+          <LeadSourceCard />
+        </div>
+        <div className="col-span-full lg:col-span-4">
+          <ActivityFeed />
+        </div>
+        <div className="col-span-full lg:col-span-4">
+          <PerformanceCard />
         </div>
 
-        <div>
-          <button 
-            onClick={handleLogout}
-            className="w-full flex items-center px-4 py-3 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-xl font-medium transition-colors"
-          >
-            <LogOut className="w-5 h-5 mr-3" />
-            Sign Out
-          </button>
-        </div>
+        {/* Row 3: Health Score */}
+        <HealthScoreCard />
+
+        {/* Row 4: Pipeline funnel strip */}
+        <PipelineStrip />
+
+        {/* Row 5: Campaign cards */}
+        <CampaignCards />
       </div>
-
-      {/* Main Content */}
-      <div className="flex-1 p-8 md:p-12">
-        <header className="mb-10">
-          <h1 className="text-3xl font-bold text-slate-900">Welcome to your dashboard</h1>
-          <p className="text-slate-500 mt-2">Setup complete. Your workspace is ready.</p>
-        </header>
-
-        <div className="grid md:grid-cols-3 gap-6">
-          {/* Placeholder Widgets */}
-          <div className="glass-panel p-6 rounded-2xl bg-white card-shadow md:col-span-2 flex items-center justify-center min-h-[300px]">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <BarChart3 className="w-8 h-8" />
-              </div>
-              <h3 className="text-lg font-semibold text-slate-900">Analytics Empty</h3>
-              <p className="text-slate-500 text-sm max-w-sm mt-2">Connect your first ad account or data source to start generating marketing ROI reports.</p>
-            </div>
-          </div>
-          
-          <div className="glass-panel p-6 rounded-2xl bg-white card-shadow flex items-center justify-center min-h-[300px]">
-            <p className="text-slate-400 text-sm">Widget Placeholder</p>
-          </div>
-        </div>
-      </div>
-    </div>
+    </>
   );
 }
