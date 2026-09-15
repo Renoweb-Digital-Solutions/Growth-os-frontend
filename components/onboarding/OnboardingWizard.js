@@ -13,6 +13,7 @@ import {
   Check
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import apiClient from "../../lib/apiClient";
 
 const STEPS = [
   "Business Type",
@@ -145,12 +146,9 @@ export default function OnboardingWizard() {
         const token = localStorage.getItem("token");
         if (!token) return router.push("/auth");
 
-        const res = await fetch("http://localhost:7007/api/users/me", {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
+        const data = await apiClient.get("/api/users/me");
         
-        if (res.ok) {
-          const data = await res.json();
+        if (data && data.user) {
           if (data.user.onboardingComplete) {
             router.push("/dashboard");
             return;
@@ -193,18 +191,10 @@ export default function OnboardingWizard() {
   const saveProgress = async (nextStepIndex, isComplete = false) => {
     setIsSaving(true);
     try {
-      const token = localStorage.getItem("token");
-      await fetch("http://localhost:7007/api/users/onboarding", {
-        method: "PUT",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          ...formData,
-          onboardingStep: nextStepIndex,
-          onboardingComplete: isComplete
-        })
+      await apiClient.put("/api/users/onboarding", {
+        ...formData,
+        onboardingStep: nextStepIndex,
+        onboardingComplete: isComplete
       });
       
       if (isComplete) {

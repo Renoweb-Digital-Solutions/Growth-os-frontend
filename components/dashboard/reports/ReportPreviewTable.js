@@ -10,12 +10,20 @@ import { previewData } from "@/app/dashboard/reports/mockReports";
 
 const columns = ["Date", "Channel", "Reach", "Engagement", "Clicks", "Conversions", "Spend"];
 
-export default function ReportPreviewTable() {
+export default function ReportPreviewTable({ data, loading }) {
   return (
     <div className="dashboard-card p-6 overflow-hidden">
-      <h3 className="text-[15px] font-semibold text-slate-800 mb-4">
-        Report Preview
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-[15px] font-semibold text-slate-800">
+          Report Preview
+        </h3>
+        {loading && (
+          <div className="text-[12px] font-medium text-slate-500 flex items-center gap-1.5">
+            <div className="animate-spin w-3.5 h-3.5 border-2 border-indigo-600 border-t-transparent rounded-full" />
+            Syncing Live Data...
+          </div>
+        )}
+      </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-left">
@@ -32,18 +40,35 @@ export default function ReportPreviewTable() {
             </tr>
           </thead>
           <tbody>
-            {previewData.map((row, idx) => (
+            {!loading && data?.length === 0 && (
+              <tr>
+                <td colSpan={columns.length} className="py-8 text-center text-[13px] text-slate-500">
+                  No data to preview for selected channels.
+                </td>
+              </tr>
+            )}
+            
+            {data?.map((row, idx) => (
               <tr
                 key={idx}
-                className={`border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${
-                  idx % 2 === 1 ? "bg-slate-50/30" : ""
+                className={`border-b transition-colors ${
+                  row.isLiveData 
+                    ? "bg-indigo-50/40 border-indigo-100 hover:bg-indigo-50/60" 
+                    : `border-slate-50 hover:bg-slate-50/50 ${idx % 2 === 1 ? "bg-slate-50/30" : ""}`
                 }`}
               >
                 <td className="py-3 pr-4 text-[13px] text-slate-600">{row.date}</td>
-                <td className="py-3 pr-4 text-[13px] font-medium text-slate-800">{row.channel}</td>
-                <td className="py-3 pr-4 text-[13px] text-slate-800">{row.reach.toLocaleString()}</td>
-                <td className="py-3 pr-4 text-[13px] text-slate-800">{row.engagement.toLocaleString()}</td>
-                <td className="py-3 pr-4 text-[13px] text-slate-800">{row.clicks.toLocaleString()}</td>
+                <td className="py-3 pr-4 text-[13px] font-medium text-slate-800 flex items-center gap-2">
+                  {row.channel}
+                  {row.isLiveData && (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700">
+                      LIVE
+                    </span>
+                  )}
+                </td>
+                <td className="py-3 pr-4 text-[13px] text-slate-800">{row.reach?.toLocaleString()}</td>
+                <td className="py-3 pr-4 text-[13px] text-slate-800">{row.engagement?.toLocaleString()}</td>
+                <td className="py-3 pr-4 text-[13px] text-slate-800">{row.clicks?.toLocaleString()}</td>
                 <td className="py-3 pr-4 text-[13px] font-semibold text-indigo-600">{row.conversions}</td>
                 <td className="py-3 pr-4 text-[13px] text-slate-600">{row.spend}</td>
               </tr>

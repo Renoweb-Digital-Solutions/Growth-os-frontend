@@ -1,46 +1,36 @@
 "use client";
 
-import { useState } from "react";
 import { FileDown, FileText } from "lucide-react";
-import {
-  reportTypes,
-  granularities,
-  datePresets,
-  channels,
-  previewData,
-} from "@/app/dashboard/reports/mockReports";
+import { reportTypes, granularities, datePresets, channels } from "@/app/dashboard/reports/mockReports";
 
-// Reason: Report builder card with dropdowns and functional CSV generation.
-// How: Renders report type, granularity, date preset, and channel selectors.
-//      "Generate CSV" creates a real Blob download from previewData. "Generate PDF"
-//      is a placeholder button for future implementation.
-// Receives: nothing (reads config from mockReports)
-// Passes: nothing
-
-export default function ReportBuilder() {
-  const [reportType, setReportType] = useState(reportTypes[0]);
-  const [granularity, setGranularity] = useState(granularities[2]);
-  const [datePreset, setDatePreset] = useState(datePresets[0].value);
-  const [selectedChannels, setSelectedChannels] = useState([...channels]);
-
-  // Reason: Functional CSV download using Blob API — works immediately with mock data.
-  // How: Converts previewData to CSV string, creates a Blob, triggers download via
-  //      temporary anchor element. No external libraries needed.
+export default function ReportBuilder({
+  reportType,
+  setReportType,
+  granularity,
+  setGranularity,
+  datePreset,
+  setDatePreset,
+  selectedChannels,
+  setSelectedChannels,
+  tableData
+}) {
   const handleGenerateCSV = () => {
     const headers = ["Date", "Channel", "Reach", "Engagement", "Clicks", "Conversions", "Spend"];
-    const rows = previewData
-      .filter((row) => selectedChannels.includes(row.channel))
-      .map((row) => [
-        row.date,
-        row.channel,
-        row.reach,
-        row.engagement,
-        row.clicks,
-        row.conversions,
-        row.spend,
-      ]);
+    
+    // tableData is already filtered by selectedChannels from the parent component
+    const rows = tableData.map((row) => [
+      row.date,
+      row.channel,
+      row.reach,
+      row.engagement,
+      row.clicks,
+      row.conversions,
+      row.spend,
+    ]);
 
-    const csvContent = [headers, ...rows].map((r) => r.join(",")).join("\n");
+    const csvContent = [headers, ...rows]
+      .map((rowArr) => rowArr.map((v) => `"${v}"`).join(","))
+      .join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");

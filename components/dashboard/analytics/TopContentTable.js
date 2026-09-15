@@ -3,31 +3,22 @@
 import { useState } from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
 
-// Reason: Sortable table of top performing content with platform badges and metrics.
-// How: Renders a table with sortable column headers. Clicking a header toggles
-//      sort direction. Platform names shown as colored pills.
-// Receives: `data` (topContent array) from analytics/page.js
-// Passes: nothing
-
 const platformColors = {
-  Instagram: "bg-pink-50 text-pink-700",
-  LinkedIn: "bg-blue-50 text-blue-700",
-  Facebook: "bg-blue-50 text-blue-600",
-  YouTube: "bg-red-50 text-red-700",
-  TikTok: "bg-slate-100 text-slate-800",
+  instagram: "bg-pink-50 text-pink-700",
+  facebook: "bg-blue-50 text-blue-600",
 };
 
 const columnDefs = [
-  { key: "title", label: "Post Title", sortable: true },
+  { key: "title", label: "Post Content", sortable: true },
   { key: "platform", label: "Platform", sortable: true },
   { key: "date", label: "Date", sortable: false },
-  { key: "reach", label: "Reach", sortable: true },
-  { key: "engRate", label: "Eng. Rate", sortable: false },
-  { key: "clicks", label: "Clicks", sortable: true },
+  { key: "likes", label: "Likes", sortable: true },
+  { key: "comments", label: "Comments", sortable: true },
+  { key: "engagement", label: "Engagement", sortable: true },
 ];
 
-export default function TopContentTable({ data }) {
-  const [sortKey, setSortKey] = useState("reach");
+export default function TopContentTable({ data, capabilities, loading }) {
+  const [sortKey, setSortKey] = useState("engagement");
   const [sortAsc, setSortAsc] = useState(false);
 
   const handleSort = (key) => {
@@ -39,7 +30,22 @@ export default function TopContentTable({ data }) {
     }
   };
 
-  const sorted = [...data].sort((a, b) => {
+  const isUnavailable = capabilities?.social?.available === false && capabilities?.instagram?.available === false;
+
+  const mappedData = (data || []).map((item) => {
+    return {
+      id: item.contentId,
+      title: item.caption || item.message || "No content",
+      platform: item.platform,
+      date: new Date(item.createdTime).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      likes: item.metrics?.likeCount || 0,
+      comments: item.metrics?.commentCount || 0,
+      engagement: item.metrics?.igMediaInteractions || item.metrics?.fbPostInteractions || 0,
+      url: item.permalinkUrl,
+    };
+  });
+
+  const sorted = [...mappedData].sort((a, b) => {
     const aVal = a[sortKey];
     const bVal = b[sortKey];
     if (typeof aVal === "number") {
@@ -51,72 +57,98 @@ export default function TopContentTable({ data }) {
   });
 
   return (
-    <div className="dashboard-card p-6 overflow-hidden">
+    <div className="dashboard-card p-6 overflow-hidden relative min-h-[300px]">
       <h3 className="text-[15px] font-semibold text-slate-800 mb-4">
         Top Performing Content
       </h3>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="border-b border-slate-100">
-              {columnDefs.map((col) => (
-                <th
-                  key={col.key}
-                  onClick={() => col.sortable && handleSort(col.key)}
-                  className={`pb-3 pr-4 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400 ${
-                    col.sortable ? "cursor-pointer select-none hover:text-slate-600" : ""
-                  }`}
-                >
-                  <div className="flex items-center gap-1">
-                    {col.label}
-                    {col.sortable && sortKey === col.key && (
-                      sortAsc ? (
-                        <ChevronUp className="w-3 h-3" />
-                      ) : (
-                        <ChevronDown className="w-3 h-3" />
-                      )
-                    )}
-                  </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((item, idx) => (
-              <tr
-                key={item.id}
-                className={`border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${
-                  idx % 2 === 1 ? "bg-slate-50/30" : ""
-                }`}
-              >
-                <td className="py-3 pr-4 text-[13px] font-medium text-slate-800 max-w-[200px] truncate">
-                  {item.title}
-                </td>
-                <td className="py-3 pr-4">
-                  <span
-                    className={`inline-flex px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${
-                      platformColors[item.platform] || "bg-slate-100 text-slate-600"
+      {loading ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-sm z-10">
+          <div className="animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+        </div>
+      ) : isUnavailable ? (
+        <div className="text-center py-10 bg-slate-50 border border-slate-200 rounded-xl">
+          <h4 className="text-[14px] font-semibold text-slate-700 mb-1">
+            No Meta Content Data Available
+          </h4>
+          <p className="text-[12.5px] text-slate-500">
+            Connect a Facebook Page or Instagram Account to view content insights.
+          </p>
+        </div>
+      ) : mappedData.length === 0 ? (
+        <div className="text-center py-10 bg-slate-50 border border-slate-200 rounded-xl">
+          <h4 className="text-[14px] font-semibold text-slate-700 mb-1">
+            No recent content found
+          </h4>
+          <p className="text-[12.5px] text-slate-500">
+            No posts were published in the selected time range.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-slate-100">
+                {columnDefs.map((col) => (
+                  <th
+                    key={col.key}
+                    onClick={() => col.sortable && handleSort(col.key)}
+                    className={`pb-3 pr-4 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400 ${
+                      col.sortable ? "cursor-pointer select-none hover:text-slate-600" : ""
                     }`}
                   >
-                    {item.platform}
-                  </span>
-                </td>
-                <td className="py-3 pr-4 text-[12.5px] text-slate-500">{item.date}</td>
-                <td className="py-3 pr-4 text-[13px] font-semibold text-slate-800">
-                  {item.reach.toLocaleString()}
-                </td>
-                <td className="py-3 pr-4 text-[13px] font-semibold text-indigo-600">
-                  {item.engRate}
-                </td>
-                <td className="py-3 pr-4 text-[13px] font-semibold text-slate-800">
-                  {item.clicks.toLocaleString()}
-                </td>
+                    <div className="flex items-center gap-1">
+                      {col.label}
+                      {col.sortable && sortKey === col.key && (
+                        sortAsc ? (
+                          <ChevronUp className="w-3 h-3" />
+                        ) : (
+                          <ChevronDown className="w-3 h-3" />
+                        )
+                      )}
+                    </div>
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {sorted.map((item, idx) => (
+                <tr
+                  key={item.id}
+                  className={`border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${
+                    idx % 2 === 1 ? "bg-slate-50/30" : ""
+                  }`}
+                >
+                  <td className="py-3 pr-4 text-[13px] font-medium text-slate-800 max-w-[200px] truncate">
+                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">
+                      {item.title}
+                    </a>
+                  </td>
+                  <td className="py-3 pr-4">
+                    <span
+                      className={`inline-flex px-2 py-0.5 rounded-full text-[10.5px] font-semibold capitalize ${
+                        platformColors[item.platform.toLowerCase()] || "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {item.platform}
+                    </span>
+                  </td>
+                  <td className="py-3 pr-4 text-[12.5px] text-slate-500">{item.date}</td>
+                  <td className="py-3 pr-4 text-[13px] font-semibold text-slate-800">
+                    {typeof item.likes === "number" && Number.isFinite(item.likes) ? item.likes.toLocaleString() : item.likes}
+                  </td>
+                  <td className="py-3 pr-4 text-[13px] font-semibold text-slate-800">
+                    {typeof item.comments === "number" && Number.isFinite(item.comments) ? item.comments.toLocaleString() : item.comments}
+                  </td>
+                  <td className="py-3 pr-4 text-[13px] font-semibold text-indigo-600">
+                    {typeof item.engagement === "number" && Number.isFinite(item.engagement) ? item.engagement.toLocaleString() : item.engagement}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

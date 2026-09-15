@@ -5,9 +5,10 @@ import { Mail, Lock, Zap, User, Key, ArrowLeft, CheckCircle2 } from "lucide-reac
 import { useRouter } from "next/navigation";
 import AuthSplitLayout from "../../components/auth/AuthSplitLayout";
 import AuthInput from "../../components/auth/AuthInput";
+import apiClient from "../../lib/apiClient";
 
 // Reason: Centralized authentication route that handles both Registration and Login natively.
-// How: Uses local component state (`activeTab`, `authMethod`) to render the correct form fields. Submits data to backend via fetch.
+// How: Uses local component state (`activeTab`, `authMethod`) to render the correct form fields. Submits data to backend via apiClient.
 export default function AuthPage() {
   const router = useRouter();
   
@@ -34,7 +35,7 @@ export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   // Reason: Handles the submission of standard auth forms (Login/Signup).
-  // How: Validates inputs, makes POST requests to backend, stores JWT and redirects.
+  // How: Validates inputs, makes POST requests to backend via apiClient, stores JWT and redirects.
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -43,14 +44,10 @@ export default function AuthPage() {
     try {
       if (activeTab === "signin") {
         // Standard Email Login
-        const res = await fetch("http://localhost:7007/api/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: formData.email, password: formData.password }),
+        const data = await apiClient.post("/api/auth/login", { 
+          email: formData.email, 
+          password: formData.password 
         });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || "Something went wrong");
         
         localStorage.setItem("token", data.token);
         if (data.user && !data.user.onboardingComplete) {
@@ -67,14 +64,11 @@ export default function AuthPage() {
         }
 
         // Standard Email Sign Up
-        const res = await fetch("http://localhost:7007/api/auth/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: formData.name, email: formData.email, password: formData.password }),
+        const data = await apiClient.post("/api/auth/register", { 
+          name: formData.name, 
+          email: formData.email, 
+          password: formData.password 
         });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || "Something went wrong");
         
         localStorage.setItem("token", data.token);
         if (data.user && !data.user.onboardingComplete) {
@@ -91,7 +85,7 @@ export default function AuthPage() {
   };
 
   // Reason: Handles the 3-step password reset submission flow.
-  // How: Branches logic based on the current `forgotPasswordStep` state and calls the respective API endpoint.
+  // How: Branches logic based on the current `forgotPasswordStep` state and calls the respective API endpoint via apiClient.
   const handleForgotPasswordSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -100,36 +94,24 @@ export default function AuthPage() {
     try {
       if (forgotPasswordStep === "email") {
         // Step 1: Request OTP
-        const res = await fetch("http://localhost:7007/api/auth/forgot-password", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: formData.email }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || "Could not send OTP");
+        await apiClient.post("/api/auth/forgot-password", { email: formData.email });
         setForgotPasswordStep("otp");
       } 
       else if (forgotPasswordStep === "otp") {
         // Step 2: Verify OTP
-        const res = await fetch("http://localhost:7007/api/auth/verify-otp", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: formData.email, otp: formData.otp }),
+        const data = await apiClient.post("/api/auth/verify-otp", { 
+          email: formData.email, 
+          otp: formData.otp 
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || "Invalid OTP");
         setResetToken(data.resetToken);
         setForgotPasswordStep("new-password");
       }
       else if (forgotPasswordStep === "new-password") {
         // Step 3: Set New Password
-        const res = await fetch("http://localhost:7007/api/auth/reset-password", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ resetToken, newPassword: formData.newPassword }),
+        await apiClient.post("/api/auth/reset-password", { 
+          resetToken, 
+          newPassword: formData.newPassword 
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || "Failed to reset password");
         setForgotPasswordStep("success");
       }
     } catch (err) {
