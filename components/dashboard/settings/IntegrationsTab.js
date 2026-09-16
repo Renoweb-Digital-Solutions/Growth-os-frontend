@@ -61,6 +61,9 @@ export default function IntegrationsTab() {
       setAssets(null);
       if (err?.status !== 401) {
         setError(err?.message || "Failed to load Meta integration status.");
+      } else {
+        setMetaStatus(prev => ({ ...prev, needsReconnect: true }));
+        setError("Meta authorization expired or invalid.");
       }
     } finally {
       setIsLoadingStatus(false);
@@ -158,12 +161,23 @@ export default function IntegrationsTab() {
       {error && (
         <div className="mb-6 p-3.5 bg-red-50 text-red-600 border border-red-100 rounded-xl text-xs font-medium flex items-center justify-between gap-2 shadow-sm">
           <span>{error}</span>
-          <button
-            onClick={() => setError(null)}
-            className="text-red-400 hover:text-red-600 text-sm font-bold leading-none p-1"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-3">
+            {metaStatus?.needsReconnect && (
+              <button
+                onClick={handleConnect}
+                disabled={isConnecting}
+                className="text-red-700 hover:text-red-900 font-bold px-2 py-1 bg-red-100 rounded text-[11px] transition-colors"
+              >
+                {isConnecting ? "Reconnecting..." : "Reconnect Meta"}
+              </button>
+            )}
+            <button
+              onClick={() => setError(null)}
+              className="text-red-400 hover:text-red-600 text-sm font-bold leading-none p-1"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       )}
 
@@ -225,6 +239,10 @@ export default function IntegrationsTab() {
                       ) : metaStatus?.connected ? (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                           Connected
+                        </span>
+                      ) : metaStatus?.needsReconnect ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-700 border border-red-200">
+                          Auth Expired
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">
@@ -394,6 +412,8 @@ export default function IntegrationsTab() {
                         <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                         Connecting...
                       </>
+                    ) : metaStatus?.needsReconnect ? (
+                      "Reconnect Meta"
                     ) : (
                       "Connect Meta"
                     )}

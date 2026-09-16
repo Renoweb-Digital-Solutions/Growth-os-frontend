@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import {
   getMetaOverview,
-  getMetaAdsInsights,
 } from "@/lib/metaApi";
+import apiClient from "@/lib/apiClient";
 
 // Utility to format date for a specific timezone as YYYY-MM-DD
 function formatTimezoneDate(date, timeZone) {
@@ -97,9 +97,21 @@ const formatNumber = (val) => {
 };
 
 export function useMetaReports(filters) {
-  const [metaRow, setMetaRow] = useState(null);
+  const [data, setData] = useState({
+    overview: null,
+    social: null,
+    content: null,
+    adsAccount: null,
+    campaigns: null,
+    adSets: null,
+    adsLevel: null,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [errorType, setErrorType] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const retry = () => setRetryCount(c => c + 1);
 
   useEffect(() => {
     let isMounted = true;
@@ -108,79 +120,70 @@ export function useMetaReports(filters) {
       setLoading(true);
       setError(null);
       
-      let dateLabelFallback = "";
       try {
-        const fallbackRange = calculateDateRange(filters.datePreset, "UTC");
-        dateLabelFallback = fallbackRange.dateLabel;
-      } catch (e) {
-        // Ignore fallback calculation errors
-      }
-      
-      try {
-        // 1. Fetch Overview to get Timezone and Reach
-        const overviewRes = await getMetaOverview();
+        // Fetch Overview to get capabilities
+        const overviewRes = await getMetaOverview({ datePreset: filters.datePreset });
         if (!overviewRes.success) {
           throw new Error("Failed to load Meta overview data");
         }
         
-        const overviewData = overviewRes.data;
         const capabilities = overviewRes.meta?.capabilities || {};
-        const timezone = overviewRes.meta?.dateRange?.timezone || "UTC";
+        const requests = [];
 
-        // 2. Calculate explicit since/until
-        const { since, until, dateLabel } = calculateDateRange(filters.datePreset, timezone);
-        dateLabelFallback = dateLabel; // Update fallback with accurate TZ
+        // 1. Social
+        requests.push(
+          capabilities.social?.available || capabilities.instagram?.available
+            ? apiClient.get("/api/meta/insights/social", { datePreset: filters.datePreset })
+            : Promise.resolve({ success: true, data: null })
+        );
 
-        // 3. Fetch Ads data if capabilities allow
-        let adsRes = { success: true, data: null };
-        if (capabilities.ads?.available) {
-          adsRes = await getMetaAdsInsights({ since, until });
-        }
+        // 2. Content
+        requests.push(
+          capabilities.social?.available || capabilities.instagram?.available
+            ? apiClient.get("/api/meta/insights/content", { datePreset: filters.datePreset, limit: 100 })
+            : Promise.resolve({ success: true, data: null })
+        );
+
+        // 3. Ads Account
+        requests.push(
+          capabilities.ads?.available
+            ? apiClient.get("/api/meta/insights/ads", { datePreset: filters.datePreset })
+            : Promise.resolve({ success: true, data: null })
+        );
+
+        // 4. Campaigns
+        requests.push(
+          capabilities.ads?.available
+            ? apiClient.get("/api/meta/insights/campaigns", { limit: 100 })
+            : Promise.resolve({ success: true, data: null })
+        );
+
+        // 5. Ad Sets
+        requests.push(
+          capabilities.ads?.available
+            ? apiClient.get("/api/meta/insights/adsets", { datePreset: filters.datePreset, limit: 100 })
+            : Promise.resolve({ success: true, data: null })
+        );
+
+        // 6. Ads
+        requests.push(
+          capabilities.ads?.available
+            ? apiClient.get("/api/meta/insights/ads-level", { datePreset: filters.datePreset, limit: 100 })
+            : Promise.resolve({ success: true, data: null })
+        );
+
+        const [socialRes, contentRes, adsRes, campRes, adSetRes, adRes] = await Promise.all(requests);
 
         if (isMounted) {
-          // 4. Construct the Meta / Instagram row
-          const isAdsEmpty = !adsRes.data || !Array.isArray(adsRes.data) || adsRes.data.length === 0;
-          const rawReach = overviewData?.adsOverview?.reach;
-          
-          let clicks = "Unavailable";
-          let conversions = "Unavailable";
-          let spend = "Unavailable";
-
-          if (capabilities.ads?.available && !isAdsEmpty) {
-            const insight = adsRes.data[0];
-            clicks = formatNumber(insight.clicks);
-            spend = formatCurrency(insight.spend);
-            
-            // Extract conversions (action_type: 'lead')
-            if (insight.actions && Array.isArray(insight.actions)) {
-              const leadAction = insight.actions.find(a => a.action_type === "lead");
-              if (leadAction) {
-                conversions = formatNumber(leadAction.value);
-              } else {
-                conversions = 0; // If there are active ads but no leads, it's 0 leads.
-              }
-            } else {
-              conversions = 0;
-            }
-          }
-
-          let reach = "Unavailable";
-          if (capabilities.ads?.available && !isAdsEmpty) {
-             reach = formatNumber(rawReach);
-          } else if (capabilities.ads?.available) {
-             reach = formatNumber(rawReach);
-          }
-
-          // Construct the strict table structure
-          setMetaRow({
-            date: dateLabel,
-            channel: "Meta / Instagram",
-            reach,
-            engagement: "Unavailable", // No direct mapped metric in Phase 3 Ads
-            clicks,
-            conversions,
-            spend,
-            isLiveData: true // Flag to distinguish in UI
+          setData({
+            overview: overviewRes,
+            social: socialRes,
+            content: contentRes,
+            adsAccount: adsRes,
+            campaigns: campRes,
+            adSets: adSetRes,
+            adsLevel: adRes,
+            capabilities,
           });
         }
       } catch (err) {
@@ -188,18 +191,13 @@ export function useMetaReports(filters) {
         if (isMounted) {
           setError(err.message || "Failed to load Meta report data");
           
-          // Guarantee the Meta row is displayed with unavailable states 
-          // even if the API throws a 401 Unauthorized or other error.
-          setMetaRow({
-            date: dateLabelFallback,
-            channel: "Meta / Instagram",
-            reach: "Unavailable",
-            engagement: "Unavailable",
-            clicks: "Unavailable",
-            conversions: "Unavailable",
-            spend: "Unavailable",
-            isLiveData: true
-          });
+          if (err.message?.toLowerCase().includes("auth") || err.message?.toLowerCase().includes("token") || err.message?.toLowerCase().includes("expired")) {
+            setErrorType("auth");
+          } else if (err.message?.toLowerCase().includes("permission") || err.message?.toLowerCase().includes("access")) {
+            setErrorType("permission");
+          } else {
+            setErrorType("network");
+          }
         }
       } finally {
         if (isMounted) setLoading(false);
@@ -211,7 +209,7 @@ export function useMetaReports(filters) {
     return () => {
       isMounted = false;
     };
-  }, [filters.datePreset]); // Refetch if date preset changes
+  }, [filters.datePreset, retryCount]);
 
-  return { metaRow, loading, error };
+  return { ...data, loading, error, errorType, retry };
 }

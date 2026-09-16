@@ -2,8 +2,9 @@
 
 import { MoreHorizontal, Megaphone } from "lucide-react";
 
-export default function CampaignCards({ campaigns = [], capabilities, loading, error }) {
+export default function CampaignCards({ campaigns = [], meta, capabilities, loading, error }) {
   const isUnavailable = capabilities?.ads?.available === false;
+  const isTruncated = meta?.paginationTruncated === true || meta?.complete === false;
 
   if (loading) {
     return (
@@ -43,13 +44,28 @@ export default function CampaignCards({ campaigns = [], capabilities, loading, e
     );
   }
 
+  const normalizeNumber = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
   return (
-    <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {campaigns.map((campaign) => (
-        <div
-          key={campaign.id || campaign.name}
-          className="dashboard-card p-5 hover:shadow-lg transition-shadow duration-300 group"
-        >
+    <div className="col-span-full">
+      {isTruncated && (
+        <div className="mb-4 px-3 py-2 bg-amber-50 border border-amber-200 text-amber-700 text-[12px] rounded-lg">
+          Showing partial results. The selected date range contains more data than could be retrieved.
+        </div>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {campaigns.map((campaign) => {
+          const spend = normalizeNumber(campaign.spend);
+          const clicks = normalizeNumber(campaign.clicks);
+          return (
+            <div
+              key={campaign.id || campaign.name}
+              className="dashboard-card p-5 hover:shadow-lg transition-shadow duration-300 group"
+            >
           {/* Top row: icon + menu */}
           <div className="flex items-start justify-between mb-3">
             <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl bg-indigo-50 text-indigo-500">
@@ -77,10 +93,24 @@ export default function CampaignCards({ campaigns = [], capabilities, loading, e
             {campaign.name}
           </h4>
 
-          {/* Fallback Client text or ad account ID context */}
-          <p className="text-[12px] text-slate-400">Meta Ads</p>
+          {spend !== null ? (
+             <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
+               <div>
+                 <p className="text-[10.5px] text-slate-400 uppercase font-semibold">Spend</p>
+                 <p className="text-[13px] font-semibold text-slate-700">${spend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+               </div>
+               <div>
+                 <p className="text-[10.5px] text-slate-400 uppercase font-semibold">Clicks</p>
+                 <p className="text-[13px] font-semibold text-slate-700">{clicks !== null ? clicks.toLocaleString() : "Unavailable"}</p>
+               </div>
+             </div>
+          ) : (
+            <p className="text-[12px] text-slate-400">Meta Ads</p>
+          )}
         </div>
-      ))}
+      );
+      })}
+    </div>
     </div>
   );
 }

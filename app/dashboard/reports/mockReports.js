@@ -26,7 +26,6 @@ export const datePresets = [
 
 export const channels = [
   "Google Ads",
-  "Meta / Instagram",
   "LinkedIn",
   "Organic Search",
   "Email",
@@ -85,11 +84,9 @@ export const recentReports = [
 // How: Fetch report preview rows matching selected filters.
 export const previewData = [
   { date: "Jul 20", channel: "Google Ads", reach: 14200, engagement: 890, clicks: 420, conversions: 38, spend: "$1,240" },
-  { date: "Jul 19", channel: "Meta / Instagram", reach: 18500, engagement: 1450, clicks: 580, conversions: 52, spend: "$980" },
   { date: "Jul 18", channel: "LinkedIn", reach: 8400, engagement: 520, clicks: 210, conversions: 18, spend: "$620" },
   { date: "Jul 17", channel: "Organic Search", reach: 22100, engagement: 680, clicks: 890, conversions: 64, spend: "$0" },
   { date: "Jul 16", channel: "Email", reach: 6800, engagement: 1200, clicks: 340, conversions: 45, spend: "$120" },
   { date: "Jul 15", channel: "Google Ads", reach: 15800, engagement: 920, clicks: 460, conversions: 41, spend: "$1,180" },
-  { date: "Jul 14", channel: "Meta / Instagram", reach: 17200, engagement: 1380, clicks: 540, conversions: 48, spend: "$1,020" },
   { date: "Jul 13", channel: "LinkedIn", reach: 7900, engagement: 480, clicks: 190, conversions: 15, spend: "$580" },
 ];

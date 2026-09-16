@@ -19,7 +19,7 @@ import CampaignCards from "@/components/dashboard/CampaignCards";
 import { useMetaCampaigns } from "@/hooks/useMetaInsights";
 
 export default function DashboardPage() {
-  const { campaigns, capabilities, loading, error } = useMetaCampaigns();
+  const { campaigns, meta, capabilities, loading, error } = useMetaCampaigns();
 
   return (
     <>
@@ -53,6 +53,7 @@ export default function DashboardPage() {
         {/* Row 5: Campaign cards */}
         <CampaignCards 
           campaigns={campaigns} 
+          meta={meta}
           capabilities={capabilities} 
           loading={loading} 
           error={error} 

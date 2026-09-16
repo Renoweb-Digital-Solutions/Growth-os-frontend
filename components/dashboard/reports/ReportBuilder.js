@@ -12,25 +12,139 @@ export default function ReportBuilder({
   setDatePreset,
   selectedChannels,
   setSelectedChannels,
-  tableData
+  tableData,
+  metaData,
+  observations
 }) {
   const handleGenerateCSV = () => {
-    const headers = ["Date", "Channel", "Reach", "Engagement", "Clicks", "Conversions", "Spend"];
+    let csvSections = [];
     
-    // tableData is already filtered by selectedChannels from the parent component
-    const rows = tableData.map((row) => [
-      row.date,
-      row.channel,
-      row.reach,
-      row.engagement,
-      row.clicks,
-      row.conversions,
-      row.spend,
-    ]);
+    // Helper to format safe strings for CSV
+    const escapeCsv = (val) => {
+      if (val === null || val === undefined) return '"Unavailable"';
+      if (typeof val === 'number') return `"${val}"`;
+      return `"${String(val).replace(/"/g, '""')}"`;
+    };
+    const makeRow = (arr) => arr.map(escapeCsv).join(",");
 
-    const csvContent = [headers, ...rows]
-      .map((rowArr) => rowArr.map((v) => `"${v}"`).join(","))
-      .join("\n");
+    // 1. MOCK DATA / OTHER CHANNELS
+    if (tableData && tableData.length > 0) {
+      csvSections.push("Non-Meta Channels");
+      csvSections.push(makeRow(["Date", "Channel", "Reach", "Engagement", "Clicks", "Conversions", "Spend"]));
+      tableData.forEach(row => {
+        csvSections.push(makeRow([row.date, row.channel, row.reach, row.engagement, row.clicks, row.conversions, row.spend]));
+      });
+      csvSections.push("");
+    }
+
+    // 2. META DATA
+    if (metaData && metaData.capabilities) {
+      const { overview, social, content, adsAccount, campaigns, adSets, adsLevel, capabilities } = metaData;
+      
+      csvSections.push("=== META PERFORMANCE DATA (LIVE) ===");
+      csvSections.push(`Date Range:,${datePreset}`);
+      csvSections.push("");
+
+      if (observations && observations.length > 0) {
+        csvSections.push("--- Key Observations ---");
+        csvSections.push(makeRow(["Category", "Metric", "Observation"]));
+        observations.forEach(obs => {
+          csvSections.push(makeRow([obs.category, obs.metric, obs.description]));
+        });
+        csvSections.push("");
+      }
+
+      // Facebook
+      if (capabilities.social?.available) {
+        csvSections.push("--- Facebook Summary ---");
+        csvSections.push(makeRow(["Fan Count"]));
+        csvSections.push(makeRow([overview?.data?.socialOverview?.fanCount]));
+        csvSections.push("");
+      }
+
+      // Instagram
+      if (capabilities.instagram?.available) {
+        csvSections.push("--- Instagram Summary ---");
+        csvSections.push(makeRow(["Followers", "Media Count"]));
+        csvSections.push(makeRow([overview?.data?.instagramOverview?.followersCount, overview?.data?.instagramOverview?.lifetimeMediaCatalogCount]));
+        csvSections.push("");
+      }
+
+      // Ads Overview
+      if (capabilities.ads?.available) {
+        csvSections.push("--- Ads Account Performance ---");
+        csvSections.push(makeRow(["Spend", "Impressions", "Clicks", "Reach", "Currency"]));
+        const adsOverview = overview?.data?.adsOverview;
+        csvSections.push(makeRow([adsOverview?.spend, adsOverview?.impressions, adsOverview?.clicks, adsOverview?.reach, adsOverview?.currency]));
+        csvSections.push("");
+      }
+
+      // Content Performance
+      if (content?.data && content.data.length > 0) {
+        csvSections.push("--- Content Performance ---");
+        csvSections.push(makeRow(["Platform", "Created Time", "Media Type", "Caption/Message", "Likes/Reactions", "Comments", "Interactions"]));
+        content.data.forEach(item => {
+          const likes = item.platform === "instagram" ? item.metrics?.likeCount : item.metrics?.reactionCount;
+          const interactions = item.platform === "instagram" ? item.metrics?.igMediaInteractions : item.metrics?.fbPostInteractions;
+          csvSections.push(makeRow([
+            item.platform,
+            item.createdTime,
+            item.mediaType || "POST",
+            item.caption || item.message || "",
+            likes,
+            item.metrics?.commentCount,
+            interactions
+          ]));
+        });
+        csvSections.push("");
+      }
+
+      // Campaigns
+      if (campaigns?.data?.campaigns && campaigns.data.campaigns.length > 0) {
+        csvSections.push("--- Campaign Performance ---");
+        csvSections.push(makeRow(["Campaign Name", "Status", "Objective", "Daily Budget"]));
+        campaigns.data.campaigns.forEach(c => {
+          csvSections.push(makeRow([
+            c.name,
+            c.status,
+            c.objective,
+            c.budget?.dailyBudgetFormatted
+          ]));
+        });
+        csvSections.push("");
+      }
+
+      // Ad Sets
+      if (adSets?.data && adSets.data.length > 0) {
+        csvSections.push("--- Ad Set Performance ---");
+        csvSections.push(makeRow(["Ad Set Name", "Status", "Optimization Goal", "Daily Budget"]));
+        adSets.data.forEach(a => {
+          csvSections.push(makeRow([
+            a.name,
+            a.status,
+            a.optimizationGoal,
+            a.dailyBudget
+          ]));
+        });
+        csvSections.push("");
+      }
+
+      // Ads Level
+      if (adsLevel?.data && adsLevel.data.length > 0) {
+        csvSections.push("--- Ad Performance ---");
+        csvSections.push(makeRow(["Ad Name", "Status", "Created Time"]));
+        adsLevel.data.forEach(a => {
+          csvSections.push(makeRow([
+            a.name,
+            a.status,
+            a.createdTime
+          ]));
+        });
+        csvSections.push("");
+      }
+    }
+
+    const csvContent = csvSections.join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");

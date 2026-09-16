@@ -26,16 +26,19 @@ export default function AnalyticsKPICard({ kpi, loading }) {
             </p>
           )}
         </div>
-        {!loading && !isUnavailable && kpi.trend && (
-          <span
-            className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-              kpi.trendUp
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-red-50 text-red-600"
-            }`}
-          >
-            {kpi.trendUp ? "↑" : "↓"} {kpi.trend}
-          </span>
+        {!loading && !isUnavailable && kpi.trendAvailable && (
+          <div className="flex flex-col items-end">
+            <span
+              className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600`}
+            >
+              {kpi.percentage !== null ? `${kpi.percentage > 0 ? "+" : ""}${kpi.percentage.toFixed(1)}%` : "N/A"}
+            </span>
+            {kpi.absolute !== null && (
+              <span className="text-[10px] text-slate-400 mt-1 font-medium">
+                {kpi.absolute > 0 ? "+" : ""}{kpi.absolute.toLocaleString()}
+              </span>
+            )}
+          </div>
         )}
       </div>
 

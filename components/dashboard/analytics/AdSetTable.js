@@ -3,22 +3,20 @@
 import { useState } from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
 
-const platformColors = {
-  instagram: "bg-pink-50 text-pink-700",
-  facebook: "bg-blue-50 text-blue-600",
-};
-
 const columnDefs = [
-  { key: "title", label: "Post Content", sortable: true },
-  { key: "platform", label: "Platform", sortable: true },
-  { key: "date", label: "Date", sortable: false },
-  { key: "likes", label: "Likes", sortable: true },
-  { key: "comments", label: "Comments", sortable: true },
-  { key: "engagement", label: "Engagement", sortable: true },
+  { key: "name", label: "Ad Set Name", sortable: true },
+  { key: "spend", label: "Spend", sortable: true },
+  { key: "impressions", label: "Impressions", sortable: true },
+  { key: "reach", label: "Reach", sortable: true },
+  { key: "clicks", label: "Clicks", sortable: true },
+  { key: "ctr", label: "CTR", sortable: true },
+  { key: "cpc", label: "CPC", sortable: true },
+  { key: "cpm", label: "CPM", sortable: true },
+  { key: "conversions", label: "Leads", sortable: true },
 ];
 
-export default function TopContentTable({ data, meta, capabilities, loading }) {
-  const [sortKey, setSortKey] = useState("engagement");
+export default function AdSetTable({ data, meta, capabilities, loading }) {
+  const [sortKey, setSortKey] = useState("spend");
   const [sortAsc, setSortAsc] = useState(false);
 
   const handleSort = (key) => {
@@ -30,9 +28,17 @@ export default function TopContentTable({ data, meta, capabilities, loading }) {
     }
   };
 
-  const isUnavailable = capabilities?.social?.available === false && capabilities?.instagram?.available === false;
+  const isUnavailable = capabilities?.ads?.available === false;
 
   const mappedData = (data || []).map((item) => {
+    let leads = 0;
+    if (Array.isArray(item.actions)) {
+      const leadAction = item.actions.find(a => a.action_type === "lead");
+      if (leadAction && Number.isFinite(parseFloat(leadAction.value))) {
+        leads = parseFloat(leadAction.value);
+      }
+    }
+
     const normalizeNumber = (value) => {
       if (value === null || value === undefined || value === "") return null;
       const parsed = Number(value);
@@ -40,14 +46,16 @@ export default function TopContentTable({ data, meta, capabilities, loading }) {
     };
 
     return {
-      id: item.contentId,
-      title: item.caption || item.message || "No content",
-      platform: item.platform,
-      date: new Date(item.createdTime).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      likes: normalizeNumber(item.metrics?.likeCount),
-      comments: normalizeNumber(item.metrics?.commentCount),
-      engagement: normalizeNumber(item.metrics?.igMediaInteractions ?? item.metrics?.fbPostInteractions),
-      url: item.permalinkUrl,
+      id: item.adset_id || item.name,
+      name: item.adset_name || item.name || "Unknown Ad Set",
+      spend: normalizeNumber(item.spend),
+      impressions: normalizeNumber(item.impressions),
+      reach: normalizeNumber(item.reach),
+      clicks: normalizeNumber(item.clicks),
+      ctr: normalizeNumber(item.ctr),
+      cpc: normalizeNumber(item.cpc),
+      cpm: normalizeNumber(item.cpm),
+      conversions: leads === 0 && !item.actions ? null : leads,
     };
   });
 
@@ -62,12 +70,16 @@ export default function TopContentTable({ data, meta, capabilities, loading }) {
       : String(bVal).localeCompare(String(aVal));
   });
 
+  const formatCurrency = (val) => val === null ? "Unavailable" : `$${Number(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatNumber = (val) => val === null ? "Unavailable" : Number(val).toLocaleString();
+  const formatPercent = (val) => val === null ? "Unavailable" : `${Number(val).toFixed(2)}%`;
+
   const isTruncated = meta?.paginationTruncated === true || meta?.complete === false;
 
   return (
     <div className="dashboard-card p-6 overflow-hidden relative min-h-[300px]">
       <h3 className="text-[15px] font-semibold text-slate-800 mb-4">
-        Top Performing Content
+        Ad Set Performance
       </h3>
 
       {isTruncated && (
@@ -83,19 +95,19 @@ export default function TopContentTable({ data, meta, capabilities, loading }) {
       ) : isUnavailable ? (
         <div className="text-center py-10 bg-slate-50 border border-slate-200 rounded-xl">
           <h4 className="text-[14px] font-semibold text-slate-700 mb-1">
-            No Meta Content Data Available
+            Meta Ads Disconnected
           </h4>
           <p className="text-[12.5px] text-slate-500">
-            Connect a Facebook Page or Instagram Account to view content insights.
+            Connect a Meta Ad Account to view Ad Set insights.
           </p>
         </div>
       ) : mappedData.length === 0 ? (
         <div className="text-center py-10 bg-slate-50 border border-slate-200 rounded-xl">
           <h4 className="text-[14px] font-semibold text-slate-700 mb-1">
-            No recent content found
+            No Ad Set Data Available
           </h4>
           <p className="text-[12.5px] text-slate-500">
-            No posts were published in the selected time range.
+            No Ad Sets were active in the selected time range.
           </p>
         </div>
       ) : (
@@ -134,29 +146,16 @@ export default function TopContentTable({ data, meta, capabilities, loading }) {
                   }`}
                 >
                   <td className="py-3 pr-4 text-[13px] font-medium text-slate-800 max-w-[200px] truncate">
-                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 transition-colors">
-                      {item.title}
-                    </a>
+                    {item.name}
                   </td>
-                  <td className="py-3 pr-4">
-                    <span
-                      className={`inline-flex px-2 py-0.5 rounded-full text-[10.5px] font-semibold capitalize ${
-                        platformColors[item.platform.toLowerCase()] || "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {item.platform}
-                    </span>
-                  </td>
-                  <td className="py-3 pr-4 text-[12.5px] text-slate-500">{item.date}</td>
-                  <td className="py-3 pr-4 text-[13px] font-semibold text-slate-800">
-                    {item.likes !== null ? item.likes.toLocaleString() : "Unavailable"}
-                  </td>
-                  <td className="py-3 pr-4 text-[13px] font-semibold text-slate-800">
-                    {item.comments !== null ? item.comments.toLocaleString() : "Unavailable"}
-                  </td>
-                  <td className="py-3 pr-4 text-[13px] font-semibold text-indigo-600">
-                    {item.engagement !== null ? item.engagement.toLocaleString() : "Unavailable"}
-                  </td>
+                  <td className="py-3 pr-4 text-[13px] font-semibold text-slate-800">{formatCurrency(item.spend)}</td>
+                  <td className="py-3 pr-4 text-[13px] text-slate-600">{formatNumber(item.impressions)}</td>
+                  <td className="py-3 pr-4 text-[13px] text-slate-600">{formatNumber(item.reach)}</td>
+                  <td className="py-3 pr-4 text-[13px] text-slate-600">{formatNumber(item.clicks)}</td>
+                  <td className="py-3 pr-4 text-[13px] text-slate-600">{formatPercent(item.ctr)}</td>
+                  <td className="py-3 pr-4 text-[13px] text-slate-600">{formatCurrency(item.cpc)}</td>
+                  <td className="py-3 pr-4 text-[13px] text-slate-600">{formatCurrency(item.cpm)}</td>
+                  <td className="py-3 pr-4 text-[13px] font-semibold text-indigo-600">{formatNumber(item.conversions)}</td>
                 </tr>
               ))}
             </tbody>
