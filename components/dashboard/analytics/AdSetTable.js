@@ -15,7 +15,7 @@ const columnDefs = [
   { key: "conversions", label: "Leads", sortable: true },
 ];
 
-export default function AdSetTable({ data, meta, capabilities, loading }) {
+export default function AdSetTable({ data, meta, capabilities, loading, error, onSelectAdSet }) {
   const [sortKey, setSortKey] = useState("spend");
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -46,7 +46,7 @@ export default function AdSetTable({ data, meta, capabilities, loading }) {
     };
 
     return {
-      id: item.adset_id || item.name,
+      id: item.adset_id || item.adSetId || item.name,
       name: item.adset_name || item.name || "Unknown Ad Set",
       spend: normalizeNumber(item.spend),
       impressions: normalizeNumber(item.impressions),
@@ -56,6 +56,7 @@ export default function AdSetTable({ data, meta, capabilities, loading }) {
       cpc: normalizeNumber(item.cpc),
       cpm: normalizeNumber(item.cpm),
       conversions: leads === 0 && !item.actions ? null : leads,
+      raw: item,
     };
   });
 
@@ -82,7 +83,7 @@ export default function AdSetTable({ data, meta, capabilities, loading }) {
         Ad Set Performance
       </h3>
 
-      {isTruncated && (
+      {isTruncated && !error && (
         <div className="mb-4 px-3 py-2 bg-amber-50 border border-amber-200 text-amber-700 text-[12px] rounded-lg">
           Showing partial results. The selected date range contains more data than could be retrieved.
         </div>
@@ -91,6 +92,15 @@ export default function AdSetTable({ data, meta, capabilities, loading }) {
       {loading ? (
         <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-sm z-10">
           <div className="animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+        </div>
+      ) : error ? (
+        <div className="text-center py-10 bg-red-50 border border-red-200 rounded-xl">
+          <h4 className="text-[14px] font-semibold text-red-700 mb-1">
+            Failed to load Ad Set Data
+          </h4>
+          <p className="text-[12.5px] text-red-500">
+            {error}
+          </p>
         </div>
       ) : isUnavailable ? (
         <div className="text-center py-10 bg-slate-50 border border-slate-200 rounded-xl">
@@ -141,11 +151,12 @@ export default function AdSetTable({ data, meta, capabilities, loading }) {
               {sorted.map((item, idx) => (
                 <tr
                   key={item.id}
-                  className={`border-b border-slate-50 hover:bg-slate-50/50 transition-colors ${
-                    idx % 2 === 1 ? "bg-slate-50/30" : ""
-                  }`}
+                  onClick={() => onSelectAdSet && onSelectAdSet(item)}
+                  className={`border-b border-slate-50 hover:bg-indigo-50/40 transition-colors ${
+                    onSelectAdSet ? "cursor-pointer" : ""
+                  } ${idx % 2 === 1 ? "bg-slate-50/30" : ""}`}
                 >
-                  <td className="py-3 pr-4 text-[13px] font-medium text-slate-800 max-w-[200px] truncate">
+                  <td className="py-3 pr-4 text-[13px] font-medium text-slate-800 max-w-[200px] truncate hover:text-indigo-600 transition-colors">
                     {item.name}
                   </td>
                   <td className="py-3 pr-4 text-[13px] font-semibold text-slate-800">{formatCurrency(item.spend)}</td>

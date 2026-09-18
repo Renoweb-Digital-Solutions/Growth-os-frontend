@@ -7,7 +7,8 @@ import RecentReportsTable from "@/components/dashboard/reports/RecentReportsTabl
 import { useMetaReports } from "@/hooks/useMetaReports";
 import { connectMeta } from "@/lib/metaApi";
 import { generateContentObservations, generateCampaignObservations } from "@/lib/analyticsInsights";
-import { reportTypes, granularities, datePresets, channels, previewData } from "@/app/dashboard/reports/mockReports";
+import { reportTypes, granularities, datePresets, channels } from "@/app/dashboard/reports/mockReports";
+import ReportPreviewTable from "@/components/dashboard/reports/ReportPreviewTable";
 
 export default function ReportsPage() {
   const [reportType, setReportType] = useState(reportTypes[0]);
@@ -29,18 +30,9 @@ export default function ReportsPage() {
     }
   };
 
-  // Filter mock rows based on selected channels
-  const tableData = useMemo(() => {
-    const remainingChannels = selectedChannels.filter(c => c !== "Meta / Instagram");
-    if (remainingChannels.length > 0) {
-      return previewData.filter(row => remainingChannels.includes(row.channel));
-    }
-    return [];
-  }, [selectedChannels]);
-
   // Phase 4: Deterministic Analytics Intelligence for Reports
-  const contentObs = generateContentObservations(metaData.content, metaData.capabilities);
-  const campaignObs = generateCampaignObservations(metaData.campaigns, metaData.capabilities);
+  const contentObs = generateContentObservations(metaData?.content, metaData?.capabilities);
+  const campaignObs = generateCampaignObservations(metaData?.campaigns, metaData?.capabilities);
   const allObservations = [...contentObs, ...campaignObs];
 
   return (
@@ -83,7 +75,6 @@ export default function ReportsPage() {
           setDatePreset={setDatePreset}
           selectedChannels={selectedChannels}
           setSelectedChannels={setSelectedChannels}
-          tableData={tableData}
           metaData={metaData}
           observations={allObservations}
         />
@@ -91,7 +82,7 @@ export default function ReportsPage() {
 
       {/* Preview table */}
       <div className="mb-6">
-        <ReportPreviewTable data={tableData} metaData={metaData} loading={metaData.loading} observations={allObservations} />
+        <ReportPreviewTable metaData={metaData} loading={metaData.loading} observations={allObservations} />
       </div>
 
       {/* Recent reports */}

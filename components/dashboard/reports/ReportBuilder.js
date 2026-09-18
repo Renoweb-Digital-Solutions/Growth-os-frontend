@@ -12,7 +12,6 @@ export default function ReportBuilder({
   setDatePreset,
   selectedChannels,
   setSelectedChannels,
-  tableData,
   metaData,
   observations
 }) {
@@ -27,17 +26,7 @@ export default function ReportBuilder({
     };
     const makeRow = (arr) => arr.map(escapeCsv).join(",");
 
-    // 1. MOCK DATA / OTHER CHANNELS
-    if (tableData && tableData.length > 0) {
-      csvSections.push("Non-Meta Channels");
-      csvSections.push(makeRow(["Date", "Channel", "Reach", "Engagement", "Clicks", "Conversions", "Spend"]));
-      tableData.forEach(row => {
-        csvSections.push(makeRow([row.date, row.channel, row.reach, row.engagement, row.clicks, row.conversions, row.spend]));
-      });
-      csvSections.push("");
-    }
-
-    // 2. META DATA
+    // 1. META DATA
     if (metaData && metaData.capabilities) {
       const { overview, social, content, adsAccount, campaigns, adSets, adsLevel, capabilities } = metaData;
       

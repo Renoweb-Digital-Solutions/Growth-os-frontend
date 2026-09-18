@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { integrations } from "@/app/dashboard/settings/mockSettings";
 import {
   getMetaStatus,
@@ -26,23 +26,32 @@ export default function IntegrationsTab() {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
 
+  const abortControllerRef = useRef(null);
+
   // Fetch status and assets helper
   const fetchStatusAndAssets = useCallback(async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    const options = { signal: abortControllerRef.current.signal };
+
     setIsLoadingStatus(true);
     try {
-      const statusRes = await getMetaStatus();
+      const statusRes = await getMetaStatus(options);
       setMetaStatus(statusRes);
 
       if (statusRes && statusRes.connected) {
         setIsLoadingAssets(true);
         try {
-          const assetsRes = await getMetaAssets();
+          const assetsRes = await getMetaAssets(options);
           if (assetsRes && assetsRes.data) {
             setAssets(assetsRes.data);
           } else {
             setAssets(assetsRes);
           }
         } catch (assetErr) {
+          if (assetErr.name === "AbortError") return;
           console.error("Failed to fetch Meta assets:", assetErr);
         } finally {
           setIsLoadingAssets(false);
@@ -51,6 +60,7 @@ export default function IntegrationsTab() {
         setAssets(null);
       }
     } catch (err) {
+      if (err.name === "AbortError") return;
       console.error("Failed to fetch Meta status:", err);
       setMetaStatus({
         connected: false,
@@ -99,6 +109,12 @@ export default function IntegrationsTab() {
     }
 
     fetchStatusAndAssets();
+
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [fetchStatusAndAssets]);
 
   // Connect flow

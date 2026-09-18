@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   getMetaOverview,
 } from "@/lib/metaApi";
@@ -105,91 +105,108 @@ export function useMetaReports(filters) {
     campaigns: null,
     adSets: null,
     adsLevel: null,
+    capabilities: null,
+  });
+  const [errors, setErrors] = useState({
+    overview: null,
+    social: null,
+    content: null,
+    adsAccount: null,
+    campaigns: null,
+    adSets: null,
+    adsLevel: null,
   });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [globalError, setGlobalError] = useState(null);
   const [errorType, setErrorType] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
 
   const retry = () => setRetryCount(c => c + 1);
 
+  const abortControllerRef = useRef(null);
+
   useEffect(() => {
     let isMounted = true;
 
     async function fetchReportData() {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+      const options = { signal: abortControllerRef.current.signal };
+
       setLoading(true);
-      setError(null);
+      setGlobalError(null);
+      setErrors({});
       
       try {
         // Fetch Overview to get capabilities
-        const overviewRes = await getMetaOverview({ datePreset: filters.datePreset });
+        const overviewRes = await getMetaOverview({ datePreset: filters.datePreset }, options);
         if (!overviewRes.success) {
           throw new Error("Failed to load Meta overview data");
         }
         
         const capabilities = overviewRes.meta?.capabilities || {};
-        const requests = [];
 
-        // 1. Social
-        requests.push(
-          capabilities.social?.available || capabilities.instagram?.available
-            ? apiClient.get("/api/meta/insights/social", { datePreset: filters.datePreset })
-            : Promise.resolve({ success: true, data: null })
-        );
+        const safeFetch = async (promiseFn) => {
+          try {
+            const res = await promiseFn();
+            return { success: true, data: res?.data, meta: res?.meta, error: null };
+          } catch (err) {
+            if (err.name === "AbortError") {
+              throw err;
+            }
+            return { success: false, data: null, meta: null, error: err.message || "Request failed" };
+          }
+        };
 
-        // 2. Content
-        requests.push(
-          capabilities.social?.available || capabilities.instagram?.available
-            ? apiClient.get("/api/meta/insights/content", { datePreset: filters.datePreset, limit: 100 })
-            : Promise.resolve({ success: true, data: null })
-        );
+        // Stagger requests into small batches
+        // Batch 1: Social & Content
+        const [socialRes, contentRes] = await Promise.all([
+          safeFetch(() => capabilities.social?.available || capabilities.instagram?.available ? apiClient.get("/api/meta/insights/social", { datePreset: filters.datePreset }, options) : Promise.resolve({ success: true, data: null })),
+          safeFetch(() => capabilities.social?.available || capabilities.instagram?.available ? apiClient.get("/api/meta/insights/content", { datePreset: filters.datePreset, limit: 100 }, options) : Promise.resolve({ success: true, data: null }))
+        ]);
 
-        // 3. Ads Account
-        requests.push(
-          capabilities.ads?.available
-            ? apiClient.get("/api/meta/insights/ads", { datePreset: filters.datePreset })
-            : Promise.resolve({ success: true, data: null })
-        );
+        // Batch 2: Ads Account & Campaigns
+        const [adsRes, campRes] = await Promise.all([
+          safeFetch(() => capabilities.ads?.available ? apiClient.get("/api/meta/insights/ads", { datePreset: filters.datePreset }, options) : Promise.resolve({ success: true, data: null })),
+          safeFetch(() => capabilities.ads?.available ? apiClient.get("/api/meta/insights/campaigns", { limit: 100 }, options) : Promise.resolve({ success: true, data: null }))
+        ]);
 
-        // 4. Campaigns
-        requests.push(
-          capabilities.ads?.available
-            ? apiClient.get("/api/meta/insights/campaigns", { limit: 100 })
-            : Promise.resolve({ success: true, data: null })
-        );
-
-        // 5. Ad Sets
-        requests.push(
-          capabilities.ads?.available
-            ? apiClient.get("/api/meta/insights/adsets", { datePreset: filters.datePreset, limit: 100 })
-            : Promise.resolve({ success: true, data: null })
-        );
-
-        // 6. Ads
-        requests.push(
-          capabilities.ads?.available
-            ? apiClient.get("/api/meta/insights/ads-level", { datePreset: filters.datePreset, limit: 100 })
-            : Promise.resolve({ success: true, data: null })
-        );
-
-        const [socialRes, contentRes, adsRes, campRes, adSetRes, adRes] = await Promise.all(requests);
+        // Batch 3: Ad Sets & Ads Level
+        const [adSetRes, adRes] = await Promise.all([
+          safeFetch(() => capabilities.ads?.available ? apiClient.get("/api/meta/insights/adsets", { datePreset: filters.datePreset, limit: 100 }, options) : Promise.resolve({ success: true, data: null })),
+          safeFetch(() => capabilities.ads?.available ? apiClient.get("/api/meta/insights/ads-level", { datePreset: filters.datePreset, limit: 100 }, options) : Promise.resolve({ success: true, data: null }))
+        ]);
 
         if (isMounted) {
           setData({
             overview: overviewRes,
-            social: socialRes,
-            content: contentRes,
-            adsAccount: adsRes,
-            campaigns: campRes,
-            adSets: adSetRes,
-            adsLevel: adRes,
+            social: socialRes.success ? { data: socialRes.data } : null,
+            content: { data: contentRes.success ? (contentRes.data?.posts || contentRes.data || []) : [] }, // normalized content schema
+            adsAccount: adsRes.success ? { data: adsRes.data } : null,
+            campaigns: campRes.success ? { data: campRes.data } : null,
+            adSets: adSetRes.success ? { data: adSetRes.data } : null,
+            adsLevel: adRes.success ? { data: adRes.data } : null,
             capabilities,
+          });
+
+          setErrors({
+            social: socialRes.error,
+            content: contentRes.error,
+            adsAccount: adsRes.error,
+            campaigns: campRes.error,
+            adSets: adSetRes.error,
+            adsLevel: adRes.error,
           });
         }
       } catch (err) {
+        if (err.name === "AbortError") {
+          return;
+        }
         console.error("Meta report fetch error:", err);
         if (isMounted) {
-          setError(err.message || "Failed to load Meta report data");
+          setGlobalError(err.message || "Failed to load Meta report data");
           
           if (err.message?.toLowerCase().includes("auth") || err.message?.toLowerCase().includes("token") || err.message?.toLowerCase().includes("expired")) {
             setErrorType("auth");
@@ -208,8 +225,11 @@ export function useMetaReports(filters) {
 
     return () => {
       isMounted = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
   }, [filters.datePreset, retryCount]);
 
-  return { ...data, loading, error, errorType, retry };
+  return { ...data, datasetErrors: errors, loading, error: globalError, errorType, retry };
 }
