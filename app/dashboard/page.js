@@ -17,9 +17,11 @@ import PipelineStrip from "@/components/dashboard/PipelineStrip";
 import CampaignCards from "@/components/dashboard/CampaignCards";
 
 import { useMetaCampaigns } from "@/hooks/useMetaInsights";
+import { useMetaAssetSelection } from "@/hooks/useMetaAssetSelection";
 
 export default function DashboardPage() {
-  const { campaigns, meta, capabilities, loading, error } = useMetaCampaigns();
+  const { selectedAssets } = useMetaAssetSelection();
+  const { campaigns, meta, capabilities, loading, error } = useMetaCampaigns(selectedAssets);
 
   return (
     <>

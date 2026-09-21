@@ -32,7 +32,7 @@ function formatTimezoneDate(date, timeZone) {
   }
 }
 
-export function useMetaInsights(dateRangeDays, activeTab = "overview", adsDrillState = {}) {
+export function useMetaInsights(dateRangeDays, activeTab = "overview", selectedAssets = {}, adsDrillState = {}) {
   const [data, setData] = useState({
     overview: null,
     social: null,
@@ -69,10 +69,15 @@ export function useMetaInsights(dateRangeDays, activeTab = "overview", adsDrillS
   const abortControllerRef = useRef(null);
   const cacheRef = useRef({});
 
-  // Reset cache on dateRangeDays or retryCount change
+  // Extract selected asset IDs for explicit API parameter targeting
+  const pageId = selectedAssets?.pageId || null;
+  const instagramAccountId = selectedAssets?.instagramId || selectedAssets?.instagramAccountId || null;
+  const adAccountId = selectedAssets?.adAccountId || null;
+
+  // Reset cache on dateRangeDays, selected assets, or retryCount change
   useEffect(() => {
     cacheRef.current = {};
-  }, [dateRangeDays, retryCount]);
+  }, [dateRangeDays, pageId, instagramAccountId, adAccountId, retryCount]);
 
   useEffect(() => {
     let isMounted = true;
@@ -110,10 +115,38 @@ export function useMetaInsights(dateRangeDays, activeTab = "overview", adsDrillS
       };
 
       try {
+        // Build endpoint-specific asset query parameter sets
+        const overviewAssetParams = {};
+        if (pageId) overviewAssetParams.pageId = pageId;
+        if (instagramAccountId) overviewAssetParams.instagramAccountId = instagramAccountId;
+        if (adAccountId) overviewAssetParams.adAccountId = adAccountId;
+
+        const socialAssetParams = {};
+        if (pageId) socialAssetParams.pageId = pageId;
+        if (instagramAccountId) socialAssetParams.instagramAccountId = instagramAccountId;
+
+        const fbContentAssetParams = { platform: "facebook", limit: 50 };
+        if (pageId) fbContentAssetParams.pageId = pageId;
+
+        const igContentAssetParams = { platform: "instagram", limit: 50 };
+        if (instagramAccountId) igContentAssetParams.instagramAccountId = instagramAccountId;
+
+        const adsAssetParams = {};
+        if (adAccountId) adsAssetParams.adAccountId = adAccountId;
+
+        const campaignAssetParams = { limit: 50 };
+        if (adAccountId) campaignAssetParams.adAccountId = adAccountId;
+
+        const adSetAssetParams = { limit: 50 };
+        if (adAccountId) adSetAssetParams.adAccountId = adAccountId;
+
+        const adsLevelAssetParams = { limit: 50 };
+        if (adAccountId) adsLevelAssetParams.adAccountId = adAccountId;
+
         // Step 1: Ensure Overview & Capabilities are known
         let overviewRes = cacheRef.current.overview;
         if (!overviewRes) {
-          overviewRes = await safeFetch(() => getMetaOverview({}, options));
+          overviewRes = await safeFetch(() => getMetaOverview(overviewAssetParams, options));
           if (!overviewRes.success) {
             if (overviewRes.is429) {
               setErrorType("rate_limit");
@@ -155,37 +188,37 @@ export function useMetaInsights(dateRangeDays, activeTab = "overview", adsDrillS
         // Step 2: Tab-specific demand-driven dataset fetching
         if (activeTab === "overview") {
           if (!prevOverviewRes) {
-            prevOverviewRes = await safeFetch(() => getMetaOverview(prevDateParams, options));
+            prevOverviewRes = await safeFetch(() => getMetaOverview({ ...prevDateParams, ...overviewAssetParams }, options));
             cacheRef.current.prevOverview = prevOverviewRes;
           }
           if (capabilities.social?.available || capabilities.instagram?.available) {
             if (!socialRes) {
-              socialRes = await safeFetch(() => getMetaSocialInsights(dateParams, options));
+              socialRes = await safeFetch(() => getMetaSocialInsights({ ...dateParams, ...socialAssetParams }, options));
               cacheRef.current.social = socialRes;
             }
             if (!prevSocialRes) {
-              prevSocialRes = await safeFetch(() => getMetaSocialInsights(prevDateParams, options));
+              prevSocialRes = await safeFetch(() => getMetaSocialInsights({ ...prevDateParams, ...socialAssetParams }, options));
               cacheRef.current.prevSocial = prevSocialRes;
             }
           }
           if (capabilities.ads?.available) {
             if (!adsRes) {
-              adsRes = await safeFetch(() => getMetaAdsInsights(dateParams, options));
+              adsRes = await safeFetch(() => getMetaAdsInsights({ ...dateParams, ...adsAssetParams }, options));
               cacheRef.current.ads = adsRes;
             }
             if (!prevAdsRes) {
-              prevAdsRes = await safeFetch(() => getMetaAdsInsights(prevDateParams, options));
+              prevAdsRes = await safeFetch(() => getMetaAdsInsights({ ...prevDateParams, ...adsAssetParams }, options));
               cacheRef.current.prevAds = prevAdsRes;
             }
           }
         } else if (activeTab === "facebook") {
           if (capabilities.social?.available) {
             if (!socialRes) {
-              socialRes = await safeFetch(() => getMetaSocialInsights(dateParams, options));
+              socialRes = await safeFetch(() => getMetaSocialInsights({ ...dateParams, ...socialAssetParams }, options));
               cacheRef.current.social = socialRes;
             }
             if (!fbContentRes) {
-              fbContentRes = await safeFetch(() => getMetaContentInsights({ ...dateParams, platform: "facebook", limit: 50 }, options));
+              fbContentRes = await safeFetch(() => getMetaContentInsights({ ...dateParams, ...fbContentAssetParams }, options));
               cacheRef.current.fbContent = fbContentRes;
             }
           }
@@ -193,30 +226,30 @@ export function useMetaInsights(dateRangeDays, activeTab = "overview", adsDrillS
           // Strictly check capability first
           if (capabilities.instagram?.available) {
             if (!socialRes) {
-              socialRes = await safeFetch(() => getMetaSocialInsights(dateParams, options));
+              socialRes = await safeFetch(() => getMetaSocialInsights({ ...dateParams, ...socialAssetParams }, options));
               cacheRef.current.social = socialRes;
             }
             if (!igContentRes) {
-              igContentRes = await safeFetch(() => getMetaContentInsights({ ...dateParams, platform: "instagram", limit: 50 }, options));
+              igContentRes = await safeFetch(() => getMetaContentInsights({ ...dateParams, ...igContentAssetParams }, options));
               cacheRef.current.igContent = igContentRes;
             }
           }
         } else if (activeTab === "ads") {
           if (capabilities.ads?.available) {
             if (!adsRes) {
-              adsRes = await safeFetch(() => getMetaAdsInsights(dateParams, options));
+              adsRes = await safeFetch(() => getMetaAdsInsights({ ...dateParams, ...adsAssetParams }, options));
               cacheRef.current.ads = adsRes;
             }
             if (!campaignsRes) {
-              campaignsRes = await safeFetch(() => getMetaCampaignInsights({ ...dateParams, limit: 50 }, options));
+              campaignsRes = await safeFetch(() => getMetaCampaignInsights({ ...dateParams, ...campaignAssetParams }, options));
               cacheRef.current.campaigns = campaignsRes;
             }
             if (!adSetsRes) {
-              adSetsRes = await safeFetch(() => getMetaAdSetInsights({ ...dateParams, limit: 50 }, options));
+              adSetsRes = await safeFetch(() => getMetaAdSetInsights({ ...dateParams, ...adSetAssetParams }, options));
               cacheRef.current.adSets = adSetsRes;
             }
             if (!adsLevelRes) {
-              adsLevelRes = await safeFetch(() => getMetaAdsLevelInsights({ ...dateParams, limit: 50 }, options));
+              adsLevelRes = await safeFetch(() => getMetaAdsLevelInsights({ ...dateParams, ...adsLevelAssetParams }, options));
               cacheRef.current.adsLevel = adsLevelRes;
             }
           }
@@ -283,12 +316,12 @@ export function useMetaInsights(dateRangeDays, activeTab = "overview", adsDrillS
         abortControllerRef.current.abort();
       }
     };
-  }, [dateRangeDays, activeTab, retryCount]);
+  }, [dateRangeDays, activeTab, pageId, instagramAccountId, adAccountId, retryCount]);
 
   return { ...data, datasetErrors: errors, loading, error: globalError, errorType, retry };
 }
 
-export function useMetaCampaigns() {
+export function useMetaCampaigns(selectedAssets = {}) {
   const [campaigns, setCampaigns] = useState([]);
   const [capabilities, setCapabilities] = useState(null);
   const [meta, setMeta] = useState(null);
@@ -296,6 +329,8 @@ export function useMetaCampaigns() {
   const [error, setError] = useState(null);
 
   const abortControllerRef = useRef(null);
+
+  const adAccountId = selectedAssets?.adAccountId || null;
 
   useEffect(() => {
     let isMounted = true;
@@ -311,7 +346,10 @@ export function useMetaCampaigns() {
       setError(null);
       
       try {
-        const res = await getMetaCampaignInsights({ limit: 10 }, options);
+        const campaignParams = { limit: 10 };
+        if (adAccountId) campaignParams.adAccountId = adAccountId;
+
+        const res = await getMetaCampaignInsights(campaignParams, options);
         if (isMounted) {
           if (res.success) {
             setCampaigns(res.data?.campaigns || []);
@@ -339,7 +377,7 @@ export function useMetaCampaigns() {
         abortControllerRef.current.abort();
       }
     };
-  }, []);
+  }, [adAccountId]);
 
   return { campaigns, meta, capabilities, loading, error };
 }

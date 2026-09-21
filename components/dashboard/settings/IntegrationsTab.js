@@ -8,6 +8,11 @@ import {
   disconnectMeta,
   getMetaAssets,
 } from "@/lib/metaApi";
+import { useMetaAssetSelection } from "@/hooks/useMetaAssetSelection";
+import MetaAssetSelectionModal from "@/components/dashboard/settings/MetaAssetSelectionModal";
+import FacebookIcon from "@/components/icons/FacebookIcon";
+import InstagramIcon from "@/components/icons/InstagramIcon";
+import { ChevronRight, Megaphone, CheckCircle2, SlidersHorizontal } from "lucide-react";
 
 export default function IntegrationsTab() {
   const [metaStatus, setMetaStatus] = useState({
@@ -25,6 +30,10 @@ export default function IntegrationsTab() {
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+
+  // Asset selection state & modal management
+  const [activeModalCategory, setActiveModalCategory] = useState(null);
+  const { selectedAssets, selectPage, selectInstagram, selectAdAccount } = useMetaAssetSelection(assets);
 
   const abortControllerRef = useRef(null);
 
@@ -166,6 +175,15 @@ export default function IntegrationsTab() {
     }
   };
 
+  // Selected asset lookup helpers
+  const pages = assets?.pages || [];
+  const instagramAccounts = assets?.instagramAccounts || [];
+  const adAccounts = assets?.adAccounts || [];
+
+  const selectedPage = pages.find((p) => String(p.pageId || p.id) === String(selectedAssets.pageId));
+  const selectedInstagram = instagramAccounts.find((ig) => String(ig.instagramAccountId || ig.id) === String(selectedAssets.instagramId));
+  const selectedAdAccount = adAccounts.find((ad) => String(ad.adAccountId || ad.id) === String(selectedAssets.adAccountId));
+
   return (
     <div className="dashboard-card p-6 md:p-8 max-w-4xl">
       <div className="mb-6">
@@ -210,7 +228,7 @@ export default function IntegrationsTab() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {integrations.map(integration => {
+        {integrations.map((integration) => {
           const isMeta = integration.id === "int2" || integration.name === "Meta Business Suite";
 
           if (!isMeta) {
@@ -271,11 +289,14 @@ export default function IntegrationsTab() {
                 </div>
               </div>
 
-              {/* Asset Discovery Section (when connected) */}
+              {/* Asset Discovery & Selection Section (when connected) */}
               {metaStatus?.connected && (
-                <div className="my-3 p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
+                <div className="my-3 p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-4">
                   <div className="flex items-center justify-between text-xs font-bold text-slate-800 pb-2 border-b border-slate-200/60">
-                    <span>Discovered Meta Assets</span>
+                    <span className="flex items-center gap-1.5">
+                      <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Discovered Meta Assets & Asset Selection</span>
+                    </span>
                     <button
                       onClick={() => fetchStatusAndAssets()}
                       disabled={isLoadingStatus || isLoadingAssets}
@@ -286,93 +307,162 @@ export default function IntegrationsTab() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                    {/* Facebook Pages */}
-                    <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-semibold text-slate-800 text-[11.5px] flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-blue-600" />
-                          Pages ({assets?.pages?.length || 0})
-                        </span>
-                        {assets?.capabilities?.pagesAvailable !== false ? (
-                          <span className="px-1.5 py-0.5 text-[9.5px] font-semibold bg-emerald-50 text-emerald-700 rounded">Available</span>
+                    {/* Category Summary Card 1: Facebook Pages */}
+                    <div
+                      onClick={() => pages.length > 0 && setActiveModalCategory("pages")}
+                      className={`p-3.5 bg-white rounded-xl border transition-all flex flex-col justify-between group ${
+                        pages.length > 0
+                          ? "border-slate-200 hover:border-indigo-300 hover:shadow-md cursor-pointer"
+                          : "border-slate-200 opacity-80"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-bold text-slate-800 text-[12px] flex items-center gap-1.5">
+                            <FacebookIcon className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Pages ({pages.length})</span>
+                          </span>
+                          {assets?.capabilities?.pagesAvailable !== false ? (
+                            <span className="px-1.5 py-0.5 text-[9.5px] font-semibold bg-emerald-50 text-emerald-700 rounded">Available</span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 text-[9.5px] font-semibold bg-amber-50 text-amber-700 rounded">Unavailable</span>
+                          )}
+                        </div>
+
+                        {/* Selected Asset Display */}
+                        {selectedPage ? (
+                          <div className="my-2 p-2.5 bg-blue-50/60 border border-blue-100 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-blue-600" />
+                                Selected
+                              </span>
+                            </div>
+                            <p className="text-[12px] font-bold text-slate-900 truncate mt-0.5" title={selectedPage.name}>
+                              {selectedPage.name || `Page ${selectedPage.pageId}`}
+                            </p>
+                            {selectedPage.category && (
+                              <p className="text-[10.5px] text-slate-500 truncate">{selectedPage.category}</p>
+                            )}
+                          </div>
                         ) : (
-                          <span className="px-1.5 py-0.5 text-[9.5px] font-semibold bg-amber-50 text-amber-700 rounded">Unavailable</span>
+                          <p className="text-[11px] text-slate-400 italic my-2">
+                            {pages.length === 0 ? "No Pages discovered" : "No Page selected"}
+                          </p>
                         )}
                       </div>
-                      {assets?.pages && assets.pages.length > 0 ? (
-                        <ul className="space-y-1 text-slate-600 text-[11px] max-h-24 overflow-y-auto">
-                          {assets.pages.map((p, idx) => (
-                            <li key={p.pageId || idx} className="truncate font-medium text-slate-700" title={p.name}>
-                              • {p.name || `Page ${p.pageId}`}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-[10.5px] text-slate-400 italic">
-                          {assets?.capabilities?.pagesAvailable === false
-                            ? "Unavailable — Access missing"
-                            : "No Pages found"}
-                        </p>
+
+                      {pages.length > 0 && (
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-semibold text-indigo-600 group-hover:text-indigo-800 transition-colors">
+                          <span>Change selection</span>
+                          <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                        </div>
                       )}
                     </div>
 
-                    {/* Instagram Accounts */}
-                    <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-semibold text-slate-800 text-[11.5px] flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-pink-500" />
-                          Instagram ({assets?.instagramAccounts?.length || 0})
-                        </span>
-                        {assets?.capabilities?.instagramAvailable !== false && assets?.instagramAccounts?.length > 0 ? (
-                          <span className="px-1.5 py-0.5 text-[9.5px] font-semibold bg-emerald-50 text-emerald-700 rounded">Available</span>
+                    {/* Category Summary Card 2: Instagram Accounts */}
+                    <div
+                      onClick={() => instagramAccounts.length > 0 && setActiveModalCategory("instagram")}
+                      className={`p-3.5 bg-white rounded-xl border transition-all flex flex-col justify-between group ${
+                        instagramAccounts.length > 0
+                          ? "border-slate-200 hover:border-pink-300 hover:shadow-md cursor-pointer"
+                          : "border-slate-200 opacity-80"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-bold text-slate-800 text-[12px] flex items-center gap-1.5">
+                            <InstagramIcon className="w-3.5 h-3.5 text-pink-600" />
+                            <span>Instagram ({instagramAccounts.length})</span>
+                          </span>
+                          {assets?.capabilities?.instagramAvailable !== false && instagramAccounts.length > 0 ? (
+                            <span className="px-1.5 py-0.5 text-[9.5px] font-semibold bg-emerald-50 text-emerald-700 rounded">Available</span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 text-[9.5px] font-semibold bg-amber-50 text-amber-700 rounded">Unavailable</span>
+                          )}
+                        </div>
+
+                        {/* Selected Asset Display */}
+                        {selectedInstagram ? (
+                          <div className="my-2 p-2.5 bg-pink-50/60 border border-pink-100 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-pink-700 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-pink-600" />
+                                Selected
+                              </span>
+                            </div>
+                            <p className="text-[12px] font-bold text-slate-900 truncate mt-0.5" title={`@${selectedInstagram.username}`}>
+                              @{selectedInstagram.username || selectedInstagram.name}
+                            </p>
+                            {selectedInstagram.followersCount !== undefined && (
+                              <p className="text-[10.5px] text-slate-500 font-mono">{selectedInstagram.followersCount.toLocaleString()} followers</p>
+                            )}
+                          </div>
                         ) : (
-                          <span className="px-1.5 py-0.5 text-[9.5px] font-semibold bg-amber-50 text-amber-700 rounded">Unavailable</span>
+                          <p className="text-[11px] text-slate-400 italic my-2">
+                            {instagramAccounts.length === 0 ? "No IG Accounts discovered" : "No IG Account selected"}
+                          </p>
                         )}
                       </div>
-                      {assets?.instagramAccounts && assets.instagramAccounts.length > 0 ? (
-                        <ul className="space-y-1 text-slate-600 text-[11px] max-h-24 overflow-y-auto">
-                          {assets.instagramAccounts.map((ig, idx) => (
-                            <li key={ig.instagramAccountId || idx} className="flex items-center justify-between text-[11px]" title={`@${ig.username}`}>
-                              <span className="truncate font-medium text-slate-700">@{ig.username || ig.name}</span>
-                              {ig.followersCount !== undefined && (
-                                <span className="text-[10px] text-slate-400 ml-1 font-mono">{ig.followersCount} fol.</span>
+
+                      {instagramAccounts.length > 0 && (
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-semibold text-pink-600 group-hover:text-pink-800 transition-colors">
+                          <span>Change selection</span>
+                          <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Category Summary Card 3: Ad Accounts */}
+                    <div
+                      onClick={() => adAccounts.length > 0 && setActiveModalCategory("adAccounts")}
+                      className={`p-3.5 bg-white rounded-xl border transition-all flex flex-col justify-between group ${
+                        adAccounts.length > 0
+                          ? "border-slate-200 hover:border-purple-300 hover:shadow-md cursor-pointer"
+                          : "border-slate-200 opacity-80"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-bold text-slate-800 text-[12px] flex items-center gap-1.5">
+                            <Megaphone className="w-3.5 h-3.5 text-purple-600" />
+                            <span>Ad Accounts ({adAccounts.length})</span>
+                          </span>
+                          {assets?.capabilities?.adsAvailable !== false && adAccounts.length > 0 ? (
+                            <span className="px-1.5 py-0.5 text-[9.5px] font-semibold bg-emerald-50 text-emerald-700 rounded">Available</span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 text-[9.5px] font-semibold bg-amber-50 text-amber-700 rounded">Unavailable</span>
+                          )}
+                        </div>
+
+                        {/* Selected Asset Display */}
+                        {selectedAdAccount ? (
+                          <div className="my-2 p-2.5 bg-purple-50/60 border border-purple-100 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-purple-600" />
+                                Selected
+                              </span>
+                              {selectedAdAccount.currency && (
+                                <span className="text-[10px] font-mono font-bold text-purple-600">{selectedAdAccount.currency}</span>
                               )}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-[10.5px] text-slate-400 italic">
-                          Unavailable — No IG Accounts
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Ad Accounts */}
-                    <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-semibold text-slate-800 text-[11.5px] flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-purple-600" />
-                          Ad Accounts ({assets?.adAccounts?.length || 0})
-                        </span>
-                        {assets?.capabilities?.adsAvailable !== false && assets?.adAccounts?.length > 0 ? (
-                          <span className="px-1.5 py-0.5 text-[9.5px] font-semibold bg-emerald-50 text-emerald-700 rounded">Available</span>
+                            </div>
+                            <p className="text-[12px] font-bold text-slate-900 truncate mt-0.5" title={selectedAdAccount.name}>
+                              {selectedAdAccount.name}
+                            </p>
+                          </div>
                         ) : (
-                          <span className="px-1.5 py-0.5 text-[9.5px] font-semibold bg-amber-50 text-amber-700 rounded">Unavailable</span>
+                          <p className="text-[11px] text-slate-400 italic my-2">
+                            {adAccounts.length === 0 ? "No Ad Accounts discovered" : "No Ad Account selected"}
+                          </p>
                         )}
                       </div>
-                      {assets?.adAccounts && assets.adAccounts.length > 0 ? (
-                        <ul className="space-y-1 text-slate-600 text-[11px] max-h-24 overflow-y-auto">
-                          {assets.adAccounts.map((ad, idx) => (
-                            <li key={ad.adAccountId || idx} className="flex items-center justify-between text-[11px]" title={ad.name}>
-                              <span className="truncate font-medium text-slate-700">{ad.name}</span>
-                              {ad.currency && <span className="text-[10px] text-slate-400 ml-1 font-mono">{ad.currency}</span>}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-[10.5px] text-slate-400 italic">
-                          Unavailable — No Ad Accounts
-                        </p>
+
+                      {adAccounts.length > 0 && (
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-semibold text-purple-600 group-hover:text-purple-800 transition-colors">
+                          <span>Change selection</span>
+                          <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                        </div>
                       )}
                     </div>
                   </div>
@@ -440,7 +530,34 @@ export default function IntegrationsTab() {
           );
         })}
       </div>
+
+      {/* Asset Selection Modal */}
+      {activeModalCategory && (
+        <MetaAssetSelectionModal
+          isOpen={!!activeModalCategory}
+          onClose={() => setActiveModalCategory(null)}
+          category={activeModalCategory}
+          assets={
+            activeModalCategory === "pages"
+              ? pages
+              : activeModalCategory === "instagram"
+              ? instagramAccounts
+              : adAccounts
+          }
+          selectedId={
+            activeModalCategory === "pages"
+              ? selectedAssets.pageId
+              : activeModalCategory === "instagram"
+              ? selectedAssets.instagramId
+              : selectedAssets.adAccountId
+          }
+          onSelectAsset={(id) => {
+            if (activeModalCategory === "pages") selectPage(id);
+            else if (activeModalCategory === "instagram") selectInstagram(id);
+            else if (activeModalCategory === "adAccounts") selectAdAccount(id);
+          }}
+        />
+      )}
     </div>
   );
 }
-

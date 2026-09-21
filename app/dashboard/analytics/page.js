@@ -8,6 +8,7 @@ import FacebookTab from "@/components/dashboard/analytics/FacebookTab";
 import InstagramTab from "@/components/dashboard/analytics/InstagramTab";
 import AdsTab from "@/components/dashboard/analytics/AdsTab";
 import { useMetaInsights } from "@/hooks/useMetaInsights";
+import { useMetaAssetSelection } from "@/hooks/useMetaAssetSelection";
 import { connectMeta } from "@/lib/metaApi";
 import { exportOverviewData, exportContentData, exportAdsData } from "@/lib/exportUtils";
 
@@ -16,7 +17,10 @@ export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [isReconnecting, setIsReconnecting] = useState(false);
 
-  // Demand-driven Meta insights hook
+  // Consume persisted user asset selections
+  const { selectedAssets } = useMetaAssetSelection();
+
+  // Demand-driven Meta insights hook receiving selectedAssets
   const {
     overview,
     social,
@@ -35,7 +39,7 @@ export default function AnalyticsPage() {
     error,
     errorType,
     retry,
-  } = useMetaInsights(selectedRange, activeTab);
+  } = useMetaInsights(selectedRange, activeTab, selectedAssets);
 
   const handleReconnect = async () => {
     setIsReconnecting(true);
