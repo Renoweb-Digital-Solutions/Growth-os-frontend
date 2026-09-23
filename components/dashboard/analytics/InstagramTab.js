@@ -41,25 +41,45 @@ export default function InstagramTab({
   // Extract Instagram profile metrics
   const igInsights = social?.data?.instagram?.insights || [];
 
-  const getMetricSum = (name) => {
-    const item = igInsights.find((i) => i.name === name);
-    if (item && Array.isArray(item.values)) {
-      const valid = item.values.filter((v) => v.value !== null && v.value !== undefined);
-      if (valid.length > 0) return valid.reduce((acc, v) => acc + Number(v.value), 0);
+  const evaluateMetric = (insightsArray, metricName, mode = "sum") => {
+    if (!insightsArray || !Array.isArray(insightsArray)) {
+      return { status: "UNAVAILABLE" };
     }
-    return null;
+    const item = insightsArray.find((i) => i.name === metricName);
+    if (!item) {
+      return { status: "UNAVAILABLE" };
+    }
+    if (!Array.isArray(item.values) || item.values.length === 0) {
+      return { status: "NO_DATA" };
+    }
+    const valid = item.values.filter((v) => v.value !== null && v.value !== undefined);
+    if (valid.length === 0) {
+      return { status: "NO_DATA" };
+    }
+    if (mode === "avg") {
+      const sum = valid.reduce((acc, v) => acc + Number(v.value), 0);
+      return { status: "VALUE", value: Math.round(sum / valid.length) };
+    }
+    const sum = valid.reduce((acc, v) => acc + Number(v.value), 0);
+    return { status: "VALUE", value: sum };
+  };
+
+  const renderMetricState = (metricState) => {
+    if (metricState.status === "VALUE") return formatSafeNumber(metricState.value);
+    if (metricState.status === "NO_DATA") return "No data";
+    return "Unavailable";
   };
 
   const followersCount = social?.data?.instagram?.followersCount ?? social?.data?.instagram?.details?.followersCount;
-  const impressions = getMetricSum("impressions");
-  const reach = getMetricSum("reach");
-  const profileViews = getMetricSum("profile_views");
+  const impressionsState = evaluateMetric(igInsights, "impressions");
+  const reachState = evaluateMetric(igInsights, "reach", "avg");
+  const profileViewsState = evaluateMetric(igInsights, "profile_views");
 
   const overviewCards = [
     { label: "Followers", value: formatSafeNumber(followersCount), icon: Users, color: "text-pink-600 bg-pink-50" },
-    { label: "Total Impressions", value: formatSafeNumber(impressions), icon: Eye, color: "text-purple-600 bg-purple-50" },
-    { label: "Profile Views", value: formatSafeNumber(profileViews), icon: Heart, color: "text-amber-600 bg-amber-50" },
-    { label: "Reach", value: formatSafeNumber(reach), icon: Eye, color: "text-indigo-600 bg-indigo-50" },
+    { label: "Total Impressions", value: renderMetricState(impressionsState), icon: Eye, color: "text-purple-600 bg-purple-50" },
+    { label: "Profile Views", value: renderMetricState(profileViewsState), icon: Heart, color: "text-amber-600 bg-amber-50" },
+    { label: "Reach (Daily Avg)", value: renderMetricState(reachState), icon: Eye, color: "text-indigo-600 bg-indigo-50" },
   ];
 
   // Process IG Media list
@@ -126,7 +146,7 @@ export default function InstagramTab({
 
       {/* Instagram Growth Chart */}
       <div>
-        <TrendChart data={social?.data} capabilities={capabilities} loading={loading} />
+        <TrendChart data={social?.data} capabilities={capabilities} loading={loading} activeTab="instagram" />
       </div>
 
       {/* Instagram Media Table */}

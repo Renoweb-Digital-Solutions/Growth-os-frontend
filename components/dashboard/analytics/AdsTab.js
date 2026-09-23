@@ -5,6 +5,7 @@ import CapabilityState from "@/components/dashboard/analytics/CapabilityState";
 import CampaignTable from "@/components/dashboard/analytics/CampaignTable";
 import AdSetTable from "@/components/dashboard/analytics/AdSetTable";
 import AdTable from "@/components/dashboard/analytics/AdTable";
+import TrendChart from "@/components/dashboard/analytics/TrendChart";
 import { Megaphone, ChevronRight, DollarSign, Eye, MousePointer, Target, TrendingUp, Layers, Tag } from "lucide-react";
 
 export default function AdsTab({
@@ -21,20 +22,27 @@ export default function AdsTab({
   const [selectedAdSet, setSelectedAdSet] = useState(null);
   const [selectedAd, setSelectedAd] = useState(null);
 
+  const isAdsAvail = capabilities?.ads?.available === true;
+  const isAdsDisabled = capabilities?.ads?.available === false && capabilities?.ads?.code === "REQUIREMENT_DISABLED";
   const isUnavailable = capabilities?.ads?.available === false;
 
   if (isUnavailable && !loading) {
     return (
       <CapabilityState
-        title="Meta Ads Disconnected or Unavailable"
-        description="Connect a Meta Ad Account to track campaigns, ad sets, individual ad performance, spend, CTR, CPC, and conversions."
+        title={isAdsDisabled ? "Meta Ads Not Enabled" : "Meta Ads Disconnected or Unavailable"}
+        description={
+          isAdsDisabled
+            ? "Meta Ads capability is currently disabled for this integration."
+            : "Connect a Meta Ad Account to track campaigns, ad sets, individual ad performance, spend, CTR, CPC, and conversions."
+        }
       />
     );
   }
 
-  const formatSafeCurrency = (val) => (val === null || val === undefined ? "Unavailable" : `$${Number(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
-  const formatSafeNumber = (val) => (val === null || val === undefined ? "Unavailable" : Number(val).toLocaleString());
-  const formatSafePercent = (val) => (val === null || val === undefined ? "Unavailable" : `${Number(val).toFixed(2)}%`);
+  const adsFallback = isAdsDisabled ? "Not enabled" : "Unavailable";
+  const formatSafeCurrency = (val) => (val === null || val === undefined ? adsFallback : `$${Number(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  const formatSafeNumber = (val) => (val === null || val === undefined ? adsFallback : Number(val).toLocaleString());
+  const formatSafePercent = (val) => (val === null || val === undefined ? adsFallback : `${Number(val).toFixed(2)}%`);
 
   // Aggregate Ads Overview metrics from backend `ads` payload
   const adsInsight = ads?.data?.insights?.[0] || ads?.data?.adsOverview || {};
@@ -161,6 +169,11 @@ export default function AdsTab({
               <p className="text-[10.5px] font-semibold uppercase text-slate-400">Leads</p>
               <p className="text-lg font-bold text-indigo-600 mt-1">{formatSafeNumber(leads)}</p>
             </div>
+          </div>
+
+          {/* Ads Growth Chart */}
+          <div>
+            <TrendChart adsData={ads?.data} capabilities={capabilities} loading={loading} activeTab="ads" />
           </div>
 
           {/* Level 0: Active Campaigns Table */}

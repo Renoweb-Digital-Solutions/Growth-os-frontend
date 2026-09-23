@@ -27,6 +27,7 @@ export default function CampaignTable({ campaigns = [], capabilities, loading, e
     }
   };
 
+  const isAdsDisabled = capabilities?.ads?.available === false && capabilities?.ads?.code === "REQUIREMENT_DISABLED";
   const isUnavailable = capabilities?.ads?.available === false;
 
   const mappedData = (campaigns || []).map((c) => {
@@ -92,8 +93,12 @@ export default function CampaignTable({ campaigns = [], capabilities, loading, e
         </div>
       ) : isUnavailable ? (
         <div className="text-center py-10 bg-slate-50 border border-slate-200 rounded-xl">
-          <h4 className="text-[14px] font-semibold text-slate-700 mb-1">Meta Ads Disconnected</h4>
-          <p className="text-[12.5px] text-slate-500">Connect a Meta Ad Account to view active campaigns.</p>
+          <h4 className="text-[14px] font-semibold text-slate-700 mb-1">
+            {isAdsDisabled ? "Meta Ads Not Enabled" : "Meta Ads Disconnected"}
+          </h4>
+          <p className="text-[12.5px] text-slate-500">
+            {isAdsDisabled ? "Meta Ads capability is currently disabled." : "Connect a Meta Ad Account to view active campaigns."}
+          </p>
         </div>
       ) : mappedData.length === 0 ? (
         <div className="text-center py-10 bg-slate-50 border border-slate-200 rounded-xl">

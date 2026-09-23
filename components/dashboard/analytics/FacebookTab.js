@@ -41,25 +41,41 @@ export default function FacebookTab({
   const pageDetails = social?.data?.page?.details || {};
   const insights = social?.data?.page?.insights || [];
 
-  const getMetricSum = (name) => {
-    const item = insights.find((i) => i.name === name);
-    if (item && Array.isArray(item.values)) {
-      const valid = item.values.filter((v) => v.value !== null && v.value !== undefined);
-      if (valid.length > 0) return valid.reduce((acc, v) => acc + Number(v.value), 0);
+  const evaluateMetric = (insightsArray, metricName) => {
+    if (!insightsArray || !Array.isArray(insightsArray)) {
+      return { status: "UNAVAILABLE" };
     }
-    return null;
+    const item = insightsArray.find((i) => i.name === metricName);
+    if (!item) {
+      return { status: "UNAVAILABLE" };
+    }
+    if (!Array.isArray(item.values) || item.values.length === 0) {
+      return { status: "NO_DATA" };
+    }
+    const valid = item.values.filter((v) => v.value !== null && v.value !== undefined);
+    if (valid.length === 0) {
+      return { status: "NO_DATA" };
+    }
+    const sum = valid.reduce((acc, v) => acc + Number(v.value), 0);
+    return { status: "VALUE", value: sum };
+  };
+
+  const renderMetricState = (metricState) => {
+    if (metricState.status === "VALUE") return formatSafeNumber(metricState.value);
+    if (metricState.status === "NO_DATA") return "No data";
+    return "Unavailable";
   };
 
   const fanCount = pageDetails.fanCount ?? pageDetails.followersCount;
-  const pageViews = getMetricSum("page_views_total");
-  const pageImpressions = getMetricSum("page_impressions");
-  const postEngagements = getMetricSum("page_post_engagements");
+  const pageViewsState = evaluateMetric(insights, "page_views_total");
+  const pageImpressionsState = evaluateMetric(insights, "page_impressions");
+  const postEngagementsState = evaluateMetric(insights, "page_post_engagements");
 
   const overviewCards = [
     { label: "Page Followers", value: formatSafeNumber(fanCount), icon: Users, color: "text-blue-600 bg-blue-50" },
-    { label: "Total Page Views", value: formatSafeNumber(pageViews), icon: Eye, color: "text-indigo-600 bg-indigo-50" },
-    { label: "Page Impressions", value: formatSafeNumber(pageImpressions), icon: Activity, color: "text-purple-600 bg-purple-50" },
-    { label: "Post Engagements", value: formatSafeNumber(postEngagements), icon: ThumbsUp, color: "text-pink-600 bg-pink-50" },
+    { label: "Total Page Views", value: renderMetricState(pageViewsState), icon: Eye, color: "text-indigo-600 bg-indigo-50" },
+    { label: "Page Impressions", value: renderMetricState(pageImpressionsState), icon: Activity, color: "text-purple-600 bg-purple-50" },
+    { label: "Post Engagements", value: renderMetricState(postEngagementsState), icon: ThumbsUp, color: "text-pink-600 bg-pink-50" },
   ];
 
   // Process FB Content list
@@ -127,7 +143,7 @@ export default function FacebookTab({
 
       {/* Facebook Growth Chart */}
       <div>
-        <TrendChart data={social?.data} capabilities={capabilities} loading={loading} />
+        <TrendChart data={social?.data} capabilities={capabilities} loading={loading} activeTab="facebook" />
       </div>
 
       {/* Facebook Content Table */}

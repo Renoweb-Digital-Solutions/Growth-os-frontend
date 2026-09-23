@@ -58,37 +58,39 @@ export default function OverviewTab({
   };
 
   // 1. Total Reach (Meta Ads)
-  const reachAvail = capabilities?.ads?.available;
+  const adsAvail = capabilities?.ads?.available === true;
+  const adsDisabled = capabilities?.ads?.available === false && capabilities?.ads?.code === "REQUIREMENT_DISABLED";
+  const adsText = adsDisabled ? "Not enabled" : "Unavailable";
+
   const rawReach = overview?.data?.adsOverview?.reach;
-  const reachValue = reachAvail && rawReach !== undefined && rawReach !== null ? formatSafeNumber(rawReach) : "Unavailable";
-  const prevRawReach = reachAvail && prevOverview?.data?.adsOverview?.reach !== undefined ? Number(prevOverview.data.adsOverview.reach) : null;
+  const reachValue = adsAvail && rawReach !== undefined && rawReach !== null ? formatSafeNumber(rawReach) : adsText;
+  const prevRawReach = adsAvail && prevOverview?.data?.adsOverview?.reach !== undefined ? Number(prevOverview.data.adsOverview.reach) : null;
   const reachTrend = calculateTrend(rawReach !== undefined ? Number(rawReach) : null, prevRawReach);
 
   // 2. FB Page Views
-  const socialAvail = capabilities?.social?.available;
+  const socialAvail = capabilities?.social?.available === true;
   const fbPageViews = socialAvail ? sumInsightValues(social?.data?.page?.insights, "page_views_total") : null;
-  const fbViewsValue = socialAvail ? (fbPageViews !== null ? formatSafeNumber(fbPageViews) : "0") : "Unavailable";
+  const fbViewsValue = socialAvail ? (fbPageViews !== null ? formatSafeNumber(fbPageViews) : "Unavailable") : "Unavailable";
   const prevFbPageViews = socialAvail ? sumInsightValues(prevSocial?.data?.page?.insights, "page_views_total") : null;
   const fbViewsTrend = calculateTrend(fbPageViews, prevFbPageViews);
 
   // 3. IG Impressions
-  const igAvail = capabilities?.instagram?.available;
+  const igAvail = capabilities?.instagram?.available === true;
   const igImpressions = igAvail ? sumInsightValues(social?.data?.instagram?.insights, "impressions") : null;
-  const igImpsValue = igAvail ? (igImpressions !== null ? formatSafeNumber(igImpressions) : "0") : "Unavailable";
+  const igImpsValue = igAvail ? (igImpressions !== null ? formatSafeNumber(igImpressions) : "Unavailable") : "Unavailable";
   const prevIgImpressions = igAvail ? sumInsightValues(prevSocial?.data?.instagram?.insights, "impressions") : null;
   const igImpsTrend = calculateTrend(igImpressions, prevIgImpressions);
 
   // 4. Meta Ads Clicks
-  const clicksAvail = capabilities?.ads?.available;
   const rawClicks = ads?.data?.insights?.[0]?.clicks ?? overview?.data?.adsOverview?.clicks;
-  const clicksValue = clicksAvail && rawClicks !== undefined && rawClicks !== null ? formatSafeNumber(rawClicks) : "Unavailable";
-  const prevRawClicks = clicksAvail && prevAds?.data?.insights?.[0]?.clicks !== undefined ? Number(prevAds.data.insights[0].clicks) : null;
+  const clicksValue = adsAvail && rawClicks !== undefined && rawClicks !== null ? formatSafeNumber(rawClicks) : adsText;
+  const prevRawClicks = adsAvail && prevAds?.data?.insights?.[0]?.clicks !== undefined ? Number(prevAds.data.insights[0].clicks) : null;
   const clicksTrend = calculateTrend(rawClicks !== undefined ? Number(rawClicks) : null, prevRawClicks);
 
   // 5. Ads Spend
   const rawSpend = overview?.data?.adsOverview?.spend ?? ads?.data?.insights?.[0]?.spend;
-  const spendValue = clicksAvail && rawSpend !== undefined && rawSpend !== null ? `$${Number(rawSpend).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "Unavailable";
-  const prevRawSpend = clicksAvail && prevOverview?.data?.adsOverview?.spend !== undefined ? Number(prevOverview.data.adsOverview.spend) : null;
+  const spendValue = adsAvail && rawSpend !== undefined && rawSpend !== null ? `$${Number(rawSpend).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : adsText;
+  const prevRawSpend = adsAvail && prevOverview?.data?.adsOverview?.spend !== undefined ? Number(prevOverview.data.adsOverview.spend) : null;
   const spendTrend = calculateTrend(rawSpend !== undefined ? Number(rawSpend) : null, prevRawSpend);
 
   const kpis = [
@@ -115,7 +117,7 @@ export default function OverviewTab({
 
       {/* Growth Trend Chart */}
       <div>
-        <TrendChart data={social?.data} capabilities={capabilities} loading={loading} />
+        <TrendChart data={social?.data} adsData={ads?.data} capabilities={capabilities} loading={loading} activeTab="overview" />
       </div>
 
       {/* Platform Summary Cards */}
@@ -204,8 +206,8 @@ export default function OverviewTab({
                 <Megaphone className="w-4 h-4" />
                 <span>Meta Ads</span>
               </div>
-              <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${reachAvail ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                {reachAvail ? "Connected" : "Unavailable"}
+              <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${adsAvail ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                {adsAvail ? "Connected" : adsDisabled ? "Not enabled" : "Unavailable"}
               </span>
             </div>
 

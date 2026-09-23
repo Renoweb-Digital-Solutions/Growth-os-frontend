@@ -3,6 +3,7 @@
 import { MoreHorizontal, Megaphone } from "lucide-react";
 
 export default function CampaignCards({ campaigns = [], meta, capabilities, loading, error }) {
+  const isAdsDisabled = capabilities?.ads?.available === false && capabilities?.ads?.code === "REQUIREMENT_DISABLED";
   const isUnavailable = capabilities?.ads?.available === false;
   const isTruncated = meta?.paginationTruncated === true || meta?.complete === false;
 
@@ -31,14 +32,22 @@ export default function CampaignCards({ campaigns = [], meta, capabilities, load
       <div className="col-span-full dashboard-card p-8 flex flex-col items-center justify-center text-center">
         <Megaphone className="w-8 h-8 text-slate-300 mb-3" />
         <h4 className="text-[14px] font-semibold text-slate-700 mb-1">
-          {error ? "Failed to load Campaigns" : isUnavailable ? "Meta Ads Disconnected" : "No Active Campaigns"}
+          {error
+            ? "Failed to load Campaigns"
+            : isAdsDisabled
+            ? "Meta Ads Not Enabled"
+            : isUnavailable
+            ? "Meta Ads Disconnected"
+            : "No Active Campaigns"}
         </h4>
         <p className="text-[12.5px] text-slate-500 max-w-sm">
-          {error 
-            ? error 
-            : isUnavailable 
-              ? "Connect a Meta Ad Account to view and track your active marketing campaigns."
-              : "There are no active Meta Ad campaigns found for this account."}
+          {error
+            ? error
+            : isAdsDisabled
+            ? "Meta Ads capability is currently disabled."
+            : isUnavailable
+            ? "Connect a Meta Ad Account to view and track your active marketing campaigns."
+            : "There are no active Meta Ad campaigns found for this account."}
         </p>
       </div>
     );
