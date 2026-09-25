@@ -94,11 +94,9 @@ export const kpiData = [
 
 // TODO: replace with Meta Graph API + Google Ads API calls
 export const channelBreakdown = [
-  { name: "Instagram", value: 34, color: "#E1306C" },
-  { name: "Meta Ads", value: 26, color: "#1877F2" },
-  { name: "LinkedIn", value: 18, color: "#0A66C2" },
-  { name: "Google Ads", value: 14, color: "#34A853" },
-  { name: "Organic", value: 8, color: "#8B5CF6" },
+  { name: "LinkedIn", value: 45, color: "#0A66C2" },
+  { name: "Google Ads", value: 35, color: "#34A853" },
+  { name: "Organic Search", value: 20, color: "#8B5CF6" },
 ];
 
 // TODO: replace with content performance API
@@ -113,35 +111,3 @@ export const topContent = [
   { id: 8, title: "Flash Sale Announcement", platform: "Facebook", date: "Jun 25", reach: 16500, engRate: "5.9%", clicks: 390 },
 ];
 
-export const audienceAge = [
-  { group: "18-24", percentage: 22 },
-  { group: "25-34", percentage: 38 },
-  { group: "35-44", percentage: 24 },
-  { group: "45-54", percentage: 11 },
-  { group: "55+", percentage: 5 },
-];
-
-export const audienceGender = [
-  { name: "Male", value: 46, color: "#6366F1" },
-  { name: "Female", value: 48, color: "#EC4899" },
-  { name: "Other", value: 6, color: "#94A3B8" },
-];
-
-export const funnelData = [
-  { stage: "Impressions", value: 482000 },
-  { stage: "Clicks", value: 28500 },
-  { stage: "Leads", value: 4200 },
-  { stage: "Conversions", value: 1860 },
-];
-
-// TODO: replace with weekly analytics aggregate endpoint
-export const weeklyComparison = [
-  { week: "W1", posts: 12, engagement: 3400 },
-  { week: "W2", posts: 15, engagement: 4200 },
-  { week: "W3", posts: 10, engagement: 2800 },
-  { week: "W4", posts: 18, engagement: 5100 },
-  { week: "W5", posts: 14, engagement: 3900 },
-  { week: "W6", posts: 16, engagement: 4600 },
-  { week: "W7", posts: 20, engagement: 5800 },
-  { week: "W8", posts: 17, engagement: 4900 },
-];

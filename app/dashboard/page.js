@@ -5,10 +5,6 @@
 // How: Renders the Header (greeting + filters) and all dashboard widgets in a
 //      CSS Grid layout (12-column on desktop).
 
-// Central State: No central state management yet — each component reads from mockData.js.
-// Data Flow: All data flows from mockData.js → individual components. No inter-component
-//            data passing in this initial build.
-
 // Component imports from frontend/components/dashboard/
 import Header from "@/components/dashboard/Header";
 import ForecastChart from "@/components/dashboard/ForecastChart";
@@ -20,7 +16,13 @@ import PerformanceCard from "@/components/dashboard/PerformanceCard";
 import PipelineStrip from "@/components/dashboard/PipelineStrip";
 import CampaignCards from "@/components/dashboard/CampaignCards";
 
+import { useMetaCampaigns } from "@/hooks/useMetaInsights";
+import { useMetaAssetSelection } from "@/hooks/useMetaAssetSelection";
+
 export default function DashboardPage() {
+  const { selectedAssets } = useMetaAssetSelection();
+  const { campaigns, meta, capabilities, loading, error } = useMetaCampaigns(selectedAssets);
+
   return (
     <>
       {/* Header with search, greeting, filters */}
@@ -51,7 +53,13 @@ export default function DashboardPage() {
         <PipelineStrip />
 
         {/* Row 5: Campaign cards */}
-        <CampaignCards />
+        <CampaignCards 
+          campaigns={campaigns} 
+          meta={meta}
+          capabilities={capabilities} 
+          loading={loading} 
+          error={error} 
+        />
       </div>
     </>
   );
