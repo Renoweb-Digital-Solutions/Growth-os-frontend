@@ -60,7 +60,7 @@ export default function OverviewTab({
   // 1. Total Reach (Meta Ads)
   const adsAvail = capabilities?.ads?.available === true;
   const adsDisabled = capabilities?.ads?.available === false && capabilities?.ads?.code === "REQUIREMENT_DISABLED";
-  const adsText = adsDisabled ? "Not enabled" : "Unavailable";
+  const adsText = adsAvail ? "Unavailable" : (adsDisabled ? "Not enabled" : "Not Connected");
 
   const rawReach = overview?.data?.adsOverview?.reach;
   const reachValue = adsAvail && rawReach !== undefined && rawReach !== null ? formatSafeNumber(rawReach) : adsText;
@@ -69,15 +69,17 @@ export default function OverviewTab({
 
   // 2. FB Page Views
   const socialAvail = capabilities?.social?.available === true;
+  const fbText = socialAvail ? "Unavailable" : "Not Connected";
   const fbPageViews = socialAvail ? sumInsightValues(social?.data?.page?.insights, "page_views_total") : null;
-  const fbViewsValue = socialAvail ? (fbPageViews !== null ? formatSafeNumber(fbPageViews) : "Unavailable") : "Unavailable";
+  const fbViewsValue = socialAvail ? (fbPageViews !== null ? formatSafeNumber(fbPageViews) : fbText) : fbText;
   const prevFbPageViews = socialAvail ? sumInsightValues(prevSocial?.data?.page?.insights, "page_views_total") : null;
   const fbViewsTrend = calculateTrend(fbPageViews, prevFbPageViews);
 
   // 3. IG Impressions
   const igAvail = capabilities?.instagram?.available === true;
+  const igText = igAvail ? "Unavailable" : "Not Connected";
   const igImpressions = igAvail ? sumInsightValues(social?.data?.instagram?.insights, "impressions") : null;
-  const igImpsValue = igAvail ? (igImpressions !== null ? formatSafeNumber(igImpressions) : "Unavailable") : "Unavailable";
+  const igImpsValue = igAvail ? (igImpressions !== null ? formatSafeNumber(igImpressions) : igText) : igText;
   const prevIgImpressions = igAvail ? sumInsightValues(prevSocial?.data?.instagram?.insights, "impressions") : null;
   const igImpsTrend = calculateTrend(igImpressions, prevIgImpressions);
 
@@ -131,7 +133,7 @@ export default function OverviewTab({
                 <span>Facebook</span>
               </div>
               <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${socialAvail ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                {socialAvail ? "Connected" : "Unavailable"}
+                {socialAvail ? "Connected" : "Not Connected"}
               </span>
             </div>
 
@@ -141,7 +143,7 @@ export default function OverviewTab({
                 <span className="font-semibold text-slate-800">
                   {overview?.data?.socialOverview?.followersCount !== undefined && overview?.data?.socialOverview?.followersCount !== null
                     ? overview.data.socialOverview.followersCount.toLocaleString()
-                    : "Unavailable"}
+                    : fbText}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -169,7 +171,7 @@ export default function OverviewTab({
                 <span>Instagram</span>
               </div>
               <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${igAvail ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                {igAvail ? "Connected" : "Unavailable"}
+                {igAvail ? "Connected" : "Not Connected"}
               </span>
             </div>
 
@@ -179,7 +181,7 @@ export default function OverviewTab({
                 <span className="font-semibold text-slate-800">
                   {overview?.data?.instagramOverview?.followersCount !== undefined && overview?.data?.instagramOverview?.followersCount !== null
                     ? overview.data.instagramOverview.followersCount.toLocaleString()
-                    : "Unavailable"}
+                    : igText}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -207,7 +209,7 @@ export default function OverviewTab({
                 <span>Meta Ads</span>
               </div>
               <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${adsAvail ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                {adsAvail ? "Connected" : adsDisabled ? "Not enabled" : "Unavailable"}
+                {adsAvail ? "Connected" : adsDisabled ? "Not enabled" : "Not Connected"}
               </span>
             </div>
 

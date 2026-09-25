@@ -54,13 +54,21 @@ export default function AnalyticsPage() {
 
   const handleExport = () => {
     if (activeTab === "overview") {
-      const formatSafeNumber = (val) => (val !== null && val !== undefined && Number.isFinite(Number(val)) ? Number(val).toLocaleString() : "Unavailable");
+      const formatSafeNumber = (val, isAvailable) => {
+        if (!isAvailable) return "Not Connected";
+        return (val !== null && val !== undefined && Number.isFinite(Number(val))) ? Number(val).toLocaleString() : "Unavailable";
+      };
+      
+      const adsAvail = capabilities?.ads?.available === true;
+      const socialAvail = capabilities?.social?.available === true;
+      const igAvail = capabilities?.instagram?.available === true;
+
       const kpiData = [
-        { label: "Total Reach", value: formatSafeNumber(overview?.data?.adsOverview?.reach) },
-        { label: "Facebook Page Followers", value: formatSafeNumber(overview?.data?.socialOverview?.followersCount) },
-        { label: "Instagram Followers", value: formatSafeNumber(overview?.data?.instagramOverview?.followersCount) },
-        { label: "Ads Spend ($)", value: overview?.data?.adsOverview?.spend !== undefined ? `$${overview.data.adsOverview.spend}` : "Unavailable" },
-        { label: "Ads Clicks", value: formatSafeNumber(overview?.data?.adsOverview?.clicks) },
+        { label: "Total Reach", value: formatSafeNumber(overview?.data?.adsOverview?.reach, adsAvail) },
+        { label: "Facebook Page Followers", value: formatSafeNumber(overview?.data?.socialOverview?.followersCount, socialAvail) },
+        { label: "Instagram Followers", value: formatSafeNumber(overview?.data?.instagramOverview?.followersCount, igAvail) },
+        { label: "Ads Spend ($)", value: adsAvail ? (overview?.data?.adsOverview?.spend !== undefined ? `$${overview.data.adsOverview.spend}` : "Unavailable") : "Not Connected" },
+        { label: "Ads Clicks", value: formatSafeNumber(overview?.data?.adsOverview?.clicks, adsAvail) },
       ];
       exportOverviewData(kpiData, selectedRange);
     } else if (activeTab === "facebook") {
