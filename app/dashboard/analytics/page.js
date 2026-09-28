@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AnalyticsHeader from "@/components/dashboard/analytics/AnalyticsHeader";
 import AnalyticsTabsNav from "@/components/dashboard/analytics/AnalyticsTabsNav";
 import OverviewTab from "@/components/dashboard/analytics/OverviewTab";
 import FacebookTab from "@/components/dashboard/analytics/FacebookTab";
 import InstagramTab from "@/components/dashboard/analytics/InstagramTab";
 import AdsTab from "@/components/dashboard/analytics/AdsTab";
+import SearchConsoleTab from "@/components/dashboard/analytics/SearchConsoleTab";
 import { useMetaInsights } from "@/hooks/useMetaInsights";
 import { useMetaAssetSelection } from "@/hooks/useMetaAssetSelection";
+import { useGoogleSearchConsole } from "@/hooks/useGoogleSearchConsole";
 import { connectMeta } from "@/lib/metaApi";
 import { exportOverviewData, exportContentData, exportAdsData } from "@/lib/exportUtils";
 
@@ -40,6 +42,14 @@ export default function AnalyticsPage() {
     errorType,
     retry,
   } = useMetaInsights(selectedRange, activeTab, selectedAssets);
+
+  // Google Search Console hook & date range synchronization
+  const gsc = useGoogleSearchConsole(selectedRange);
+  const { setDateRange: setGscDateRange } = gsc;
+
+  useEffect(() => {
+    setGscDateRange(selectedRange);
+  }, [selectedRange, setGscDateRange]);
 
   const handleReconnect = async () => {
     setIsReconnecting(true);
@@ -96,6 +106,7 @@ export default function AnalyticsPage() {
         activeTab={activeTab}
         onTabChange={(tabId) => setActiveTab(tabId)}
         capabilities={capabilities}
+        gscConnected={gsc.isConnected}
       />
 
       {/* Global Error Banner */}
@@ -176,6 +187,21 @@ export default function AnalyticsPage() {
           loading={loading}
           error={error}
           datasetErrors={datasetErrors}
+        />
+      )}
+
+      {activeTab === "gsc" && (
+        <SearchConsoleTab
+          isConnected={gsc.isConnected}
+          properties={gsc.properties}
+          selectedProperty={gsc.selectedProperty}
+          setSelectedProperty={gsc.setSelectedProperty}
+          analyticsData={gsc.analyticsData}
+          datasetErrors={gsc.datasetErrors}
+          isLoadingAnalytics={gsc.isLoadingAnalytics}
+          isLoading={gsc.isLoading}
+          error={gsc.error}
+          refresh={gsc.refresh}
         />
       )}
     </>
