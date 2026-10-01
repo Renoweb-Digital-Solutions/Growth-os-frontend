@@ -7,9 +7,48 @@ import {
 } from "recharts";
 
 export default function AnalyticsKPICard({ kpi, loading }) {
+  const isComparison = kpi.isComparison;
   const isUnavailable = kpi.value === "Unavailable";
-  const hasSparkline = !isUnavailable && kpi.sparkline && kpi.sparkline.length > 0;
+  const hasSparkline = !isComparison && !isUnavailable && kpi.sparkline && kpi.sparkline.length > 0;
   const sparkData = hasSparkline ? kpi.sparkline.map((v, i) => ({ v, i })) : [];
+
+  if (isComparison) {
+    return (
+      <div className="dashboard-card p-5 flex flex-col justify-between min-h-[140px]">
+        <div>
+          <p className="text-[12px] font-medium text-slate-400 uppercase tracking-wider mb-2.5">
+            {kpi.label}
+          </p>
+          {loading ? (
+            <div className="space-y-3 py-1">
+              <div className="h-6 w-24 bg-slate-200 animate-pulse rounded" />
+              <div className="h-5 w-24 bg-slate-200 animate-pulse rounded" />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <p className="text-[20px] font-bold text-slate-900 leading-none">
+                  {kpi.currentValue}
+                </p>
+                <p className="text-[11px] font-medium text-slate-500 mt-1">
+                  {kpi.currentLabel || "Current period"}
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100">
+                <p className="text-[17px] font-bold text-slate-500 leading-none">
+                  {kpi.comparisonValue}
+                </p>
+                <p className="text-[11px] font-medium text-slate-400 mt-1">
+                  {kpi.comparisonLabel || "Previous period"}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-card p-5 flex flex-col justify-between min-h-[140px]">
@@ -73,3 +112,4 @@ export default function AnalyticsKPICard({ kpi, loading }) {
     </div>
   );
 }
+

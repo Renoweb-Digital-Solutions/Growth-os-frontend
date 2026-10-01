@@ -22,6 +22,9 @@ export default function AnalyticsPage() {
   // Consume persisted user asset selections
   const { selectedAssets } = useMetaAssetSelection();
 
+  // Ensure Meta insights hook receives a numeric day count even when custom range is active
+  const metaRangeDays = typeof selectedRange === "number" ? selectedRange : 30;
+
   // Demand-driven Meta insights hook receiving selectedAssets
   const {
     overview,
@@ -41,7 +44,7 @@ export default function AnalyticsPage() {
     error,
     errorType,
     retry,
-  } = useMetaInsights(selectedRange, activeTab, selectedAssets);
+  } = useMetaInsights(metaRangeDays, activeTab, selectedAssets);
 
   // Google Search Console hook & date range synchronization
   const gsc = useGoogleSearchConsole(selectedRange);
@@ -63,6 +66,10 @@ export default function AnalyticsPage() {
   };
 
   const handleExport = () => {
+    const exportRangeLabel = typeof selectedRange === "object" && selectedRange?.isCustom
+      ? `${selectedRange.startDate}_to_${selectedRange.endDate}`
+      : selectedRange;
+
     if (activeTab === "overview") {
       const formatSafeNumber = (val, isAvailable) => {
         if (!isAvailable) return "Not Connected";
@@ -80,13 +87,13 @@ export default function AnalyticsPage() {
         { label: "Ads Spend ($)", value: adsAvail ? (overview?.data?.adsOverview?.spend !== undefined ? `$${overview.data.adsOverview.spend}` : "Unavailable") : "Not Connected" },
         { label: "Ads Clicks", value: formatSafeNumber(overview?.data?.adsOverview?.clicks, adsAvail) },
       ];
-      exportOverviewData(kpiData, selectedRange);
+      exportOverviewData(kpiData, exportRangeLabel);
     } else if (activeTab === "facebook") {
-      exportContentData(fbContent?.data || [], "facebook", selectedRange);
+      exportContentData(fbContent?.data || [], "facebook", exportRangeLabel);
     } else if (activeTab === "instagram") {
-      exportContentData(igContent?.data || [], "instagram", selectedRange);
+      exportContentData(igContent?.data || [], "instagram", exportRangeLabel);
     } else if (activeTab === "ads") {
-      exportAdsData(campaigns || [], "Campaigns", selectedRange);
+      exportAdsData(campaigns || [], "Campaigns", exportRangeLabel);
     }
   };
 
@@ -99,6 +106,7 @@ export default function AnalyticsPage() {
         onRefresh={retry}
         onExport={handleExport}
         isRefreshing={loading}
+        activeTab={activeTab}
       />
 
       {/* Primary Tab Navigation */}
@@ -202,8 +210,15 @@ export default function AnalyticsPage() {
           isLoading={gsc.isLoading}
           error={gsc.error}
           refresh={gsc.refresh}
+          comparisonEnabled={gsc.comparisonEnabled}
+          comparisonType={gsc.comparisonType}
+          granularity={gsc.granularity}
+          rangeLabel={gsc.rangeLabel}
+          currentLabel={gsc.currentLabel}
+          comparisonLabel={gsc.comparisonLabel}
         />
       )}
     </>
   );
 }
+
