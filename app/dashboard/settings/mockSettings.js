@@ -19,6 +19,7 @@ export const paymentMethods = [
 
 export const integrations = [
   { id: "int1", name: "Google Analytics", description: "Sync website traffic and conversion data.", status: "Connected", iconColor: "bg-yellow-500" },
+  { id: "int_gsc", name: "Google Search Console", description: "Monitor organic search performance, queries, and landing pages.", status: "Connect", iconColor: "bg-emerald-600" },
   { id: "int2", name: "Meta Business Suite", description: "Import Facebook and Instagram ad metrics.", status: "Connect", iconColor: "bg-blue-600" },
   { id: "int3", name: "LinkedIn Ads", description: "Track B2B campaign performance.", status: "Connect", iconColor: "bg-blue-700" },
   { id: "int4", name: "Slack", description: "Receive notifications and ticket updates.", status: "Connected", iconColor: "bg-purple-600" },
