@@ -220,7 +220,7 @@ export function calculateComparisonDates(modeKey) {
  * React Hook for orchestrating Google Search Console connection status,
  * verified property selection, user persistence, and insights data fetching.
  */
-export function useGoogleSearchConsole(initialConfig = 28) {
+export function useGoogleSearchConsole(initialConfig = 28, activeTab = "overview") {
   // Parse initial date range config
   const isInitialCompare = typeof initialConfig === "object" && initialConfig !== null && (initialConfig.isCompare || initialConfig.isCustomCompare);
 
@@ -377,6 +377,12 @@ export function useGoogleSearchConsole(initialConfig = 28) {
   // Main orchestration effect
   useEffect(() => {
     let isMounted = true;
+    if (activeTab && activeTab !== "gsc") {
+      setIsLoadingStatus(false);
+      setIsLoadingProperties(false);
+      setIsLoadingAnalytics(false);
+      return;
+    }
 
     async function fetchGscFlow() {
       // Abort previous in-flight requests
@@ -611,7 +617,7 @@ export function useGoogleSearchConsole(initialConfig = 28) {
         abortControllerRef.current.abort();
       }
     };
-  }, [dateRangeDays, startDate, endDate, comparisonEnabled, comparisonType, comparisonStartDate, comparisonEndDate, granularity, retryCount, getStorageKey]);
+  }, [dateRangeDays, startDate, endDate, comparisonEnabled, comparisonType, comparisonStartDate, comparisonEndDate, granularity, retryCount, getStorageKey, activeTab]);
 
   const isConnected = status?.connected === true;
   const isLoading = isLoadingStatus || isLoadingProperties || isLoadingAnalytics;

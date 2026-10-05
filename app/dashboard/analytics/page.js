@@ -1,31 +1,130 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import AnalyticsHeader from "@/components/dashboard/analytics/AnalyticsHeader";
+import { useState, useEffect, useCallback } from "react";
+import AnalyticsHeader, { AnalyticsDateSelector } from "@/components/dashboard/analytics/AnalyticsHeader";
 import AnalyticsTabsNav from "@/components/dashboard/analytics/AnalyticsTabsNav";
 import OverviewTab from "@/components/dashboard/analytics/OverviewTab";
 import FacebookTab from "@/components/dashboard/analytics/FacebookTab";
 import InstagramTab from "@/components/dashboard/analytics/InstagramTab";
 import AdsTab from "@/components/dashboard/analytics/AdsTab";
 import SearchConsoleTab from "@/components/dashboard/analytics/SearchConsoleTab";
+import GoogleAnalyticsTab from "@/components/dashboard/analytics/ga4/GoogleAnalyticsTab";
 import { useMetaInsights } from "@/hooks/useMetaInsights";
 import { useMetaAssetSelection } from "@/hooks/useMetaAssetSelection";
 import { useGoogleSearchConsole } from "@/hooks/useGoogleSearchConsole";
+import { useGoogleAnalytics } from "@/hooks/useGoogleAnalytics";
 import { connectMeta } from "@/lib/metaApi";
 import { exportOverviewData, exportContentData, exportAdsData } from "@/lib/exportUtils";
 
+const VALID_ANALYTICS_TABS = ["overview", "facebook", "instagram", "ads", "gsc", "ga4"];
+
+const TAB_ALIASES = {
+  "google-analytics": "ga4",
+  "google_analytics": "ga4",
+  "ga": "ga4",
+  "search-console": "gsc",
+  "search_console": "gsc",
+  "searchconsole": "gsc",
+  "fb": "facebook",
+  "ig": "instagram",
+};
+
+/**
+ * Synchronously calculates the initial active tab on page mount/instantiation.
+ * Inspects URL search params first (?tab=ga4), falls back to localStorage, then "overview".
+ */
+function getInitialAnalyticsTab() {
+  if (typeof window === "undefined") return "overview";
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const urlTab = params.get("tab");
+    if (urlTab) {
+      const cleanUrlTab = urlTab.toLowerCase().trim();
+      const resolved = TAB_ALIASES[cleanUrlTab] || cleanUrlTab;
+      if (VALID_ANALYTICS_TABS.includes(resolved)) {
+        return resolved;
+      }
+    }
+
+    const storedTab = localStorage.getItem("growthos_active_analytics_tab");
+    if (storedTab && VALID_ANALYTICS_TABS.includes(storedTab)) {
+      return storedTab;
+    }
+  } catch (e) {
+    console.error("Error reading initial analytics tab:", e);
+  }
+
+  return "overview";
+}
+
 export default function AnalyticsPage() {
-  const [selectedRange, setSelectedRange] = useState(30);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [selectedRange, setSelectedRange] = useState("28d");
+  const [activeTab, setActiveTab] = useState(getInitialAnalyticsTab);
   const [isReconnecting, setIsReconnecting] = useState(false);
+
+  // Sync active tab state changes to URL search params and localStorage
+  const handleTabChange = useCallback((newTab) => {
+    if (!VALID_ANALYTICS_TABS.includes(newTab)) return;
+    setActiveTab(newTab);
+
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("growthos_active_analytics_tab", newTab);
+        const url = new URL(window.location.href);
+        url.searchParams.set("tab", newTab);
+        window.history.replaceState(null, "", url.toString());
+      } catch (e) {
+        console.error("Failed to persist active analytics tab:", e);
+      }
+    }
+  }, []);
+
+  // Listen to browser Back/Forward navigation events
+  useEffect(() => {
+    const handlePopState = () => {
+      const currentTab = getInitialAnalyticsTab();
+      setActiveTab(currentTab);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  // Sync initial URL search param if initial tab originated from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (!params.get("tab")) {
+          const url = new URL(window.location.href);
+          url.searchParams.set("tab", activeTab);
+          window.history.replaceState(null, "", url.toString());
+        }
+      } catch (e) {
+        console.error("Failed to sync initial URL search param:", e);
+      }
+    }
+  }, [activeTab]);
 
   // Consume persisted user asset selections
   const { selectedAssets } = useMetaAssetSelection();
 
-  // Ensure Meta insights hook receives a numeric day count even when custom range is active
-  const metaRangeDays = typeof selectedRange === "number" ? selectedRange : 30;
+  // Ensure Meta insights hook receives a numeric day count even when custom range or string preset is active
+  const metaRangeDays = typeof selectedRange === "number"
+    ? selectedRange
+    : selectedRange === "28d" || selectedRange === "28D"
+    ? 28
+    : selectedRange === "7d" || selectedRange === "7D"
+    ? 7
+    : selectedRange === "90d" || selectedRange === "3m" || selectedRange === "3M"
+    ? 90
+    : selectedRange === "24h" || selectedRange === "24H" || selectedRange === "today" || selectedRange === "yesterday"
+    ? 1
+    : selectedRange === "30d" || selectedRange === "30D"
+    ? 30
+    : 28;
 
-  // Demand-driven Meta insights hook receiving selectedAssets
+  // Demand-driven Meta insights hook receiving activeTab
   const {
     overview,
     social,
@@ -46,13 +145,18 @@ export default function AnalyticsPage() {
     retry,
   } = useMetaInsights(metaRangeDays, activeTab, selectedAssets);
 
-  // Google Search Console hook & date range synchronization
-  const gsc = useGoogleSearchConsole(selectedRange);
+  // Google Search Console hook receiving activeTab
+  const gsc = useGoogleSearchConsole(selectedRange, activeTab);
   const { setDateRange: setGscDateRange } = gsc;
+
+  // Google Analytics 4 hook receiving activeTab
+  const ga4 = useGoogleAnalytics(selectedRange, activeTab);
+  const { setDateRange: setGa4DateRange } = ga4;
 
   useEffect(() => {
     setGscDateRange(selectedRange);
-  }, [selectedRange, setGscDateRange]);
+    setGa4DateRange(selectedRange);
+  }, [selectedRange, setGscDateRange, setGa4DateRange]);
 
   const handleReconnect = async () => {
     setIsReconnecting(true);
@@ -101,20 +205,29 @@ export default function AnalyticsPage() {
     <>
       {/* Global Analytics Header */}
       <AnalyticsHeader
-        selectedRange={selectedRange}
-        onRangeChange={(range) => setSelectedRange(range)}
-        onRefresh={retry}
+        onRefresh={() => {
+          retry();
+          if (activeTab === "gsc") gsc.refresh();
+          if (activeTab === "ga4") ga4.refresh();
+        }}
         onExport={handleExport}
-        isRefreshing={loading}
-        activeTab={activeTab}
+        isRefreshing={loading || (activeTab === "gsc" && gsc.isLoadingAnalytics) || (activeTab === "ga4" && ga4.isLoadingAnalytics)}
       />
 
       {/* Primary Tab Navigation */}
       <AnalyticsTabsNav
         activeTab={activeTab}
-        onTabChange={(tabId) => setActiveTab(tabId)}
+        onTabChange={handleTabChange}
         capabilities={capabilities}
         gscConnected={gsc.isConnected}
+        ga4Connected={ga4.isConnected}
+      />
+
+      {/* Date Range Selector */}
+      <AnalyticsDateSelector
+        selectedRange={selectedRange}
+        onRangeChange={(range) => setSelectedRange(range)}
+        activeTab={activeTab}
       />
 
       {/* Global Error Banner */}
@@ -161,7 +274,7 @@ export default function AnalyticsPage() {
           prevAds={prevAds}
           capabilities={capabilities}
           loading={loading}
-          onSwitchTab={(tabId) => setActiveTab(tabId)}
+          onSwitchTab={handleTabChange}
         />
       )}
 
@@ -218,6 +331,8 @@ export default function AnalyticsPage() {
           comparisonLabel={gsc.comparisonLabel}
         />
       )}
+
+      {activeTab === "ga4" && <GoogleAnalyticsTab gaState={ga4} />}
     </>
   );
 }
