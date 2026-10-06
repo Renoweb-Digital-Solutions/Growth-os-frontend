@@ -11,14 +11,16 @@ import {
 import { useMetaAssetSelection } from "@/hooks/useMetaAssetSelection";
 import MetaAssetSelectionModal from "@/components/dashboard/settings/MetaAssetSelectionModal";
 
-// Google Search Console Imports
+// Google Search Console & GA4 Imports
 import useGoogleSearchConsole from "@/hooks/useGoogleSearchConsole";
+import useGoogleAnalytics from "@/hooks/useGoogleAnalytics";
 import { connectGoogle, disconnectGoogle } from "@/lib/googleSearchConsoleApi";
 import GooglePropertySelectionModal from "@/components/dashboard/settings/GooglePropertySelectionModal";
+import GA4PropertySelectionModal from "@/components/dashboard/settings/GA4PropertySelectionModal";
 
 import FacebookIcon from "@/components/icons/FacebookIcon";
 import InstagramIcon from "@/components/icons/InstagramIcon";
-import { ChevronRight, Megaphone, CheckCircle2, SlidersHorizontal, Globe } from "lucide-react";
+import { ChevronRight, Megaphone, CheckCircle2, SlidersHorizontal, Globe, BarChart3 } from "lucide-react";
 
 export default function IntegrationsTab() {
   // Meta Business Suite integration state
@@ -58,6 +60,22 @@ export default function IntegrationsTab() {
   const [isGscDisconnecting, setIsGscDisconnecting] = useState(false);
   const [showGscDisconnectConfirm, setShowGscDisconnectConfirm] = useState(false);
   const [isGscModalOpen, setIsGscModalOpen] = useState(false);
+
+  // Google Analytics 4 integration hook & modal state
+  const {
+    status: ga4Status,
+    isConnected: isGa4Connected,
+    hasAnalyticsScope,
+    isLoadingStatus: isLoadingGa4Status,
+    properties: ga4Properties,
+    selectedProperty: ga4SelectedProperty,
+    selectedPropertyObj: ga4SelectedPropertyObj,
+    selectProperty: setGa4SelectedProperty,
+    isLoadingProperties: isLoadingGa4Properties,
+    refresh: refreshGa4,
+  } = useGoogleAnalytics();
+
+  const [isGa4ModalOpen, setIsGa4ModalOpen] = useState(false);
 
   const abortControllerRef = useRef(null);
 
@@ -127,22 +145,31 @@ export default function IntegrationsTab() {
     // Meta OAuth Callback Detection
     if (metaStatusParam === "success") {
       isPostOAuth = true;
-      setSuccessMessage("Meta Business Suite connected successfully.");
-      setError(null);
+      setTimeout(() => {
+        setSuccessMessage("Meta Business Suite connected successfully.");
+        setError(null);
+      }, 0);
     } else if (metaStatusParam === "error") {
       isPostOAuth = true;
-      setError(errorParam || "Meta authorization failed or was cancelled.");
+      setTimeout(() => {
+        setError(errorParam || "Meta authorization failed or was cancelled.");
+      }, 0);
     }
 
-    // Google Search Console OAuth Callback Detection
+    // Google OAuth Callback Detection (Search Console & GA4)
     if (googleStatusParam === "success") {
       isPostOAuth = true;
-      setSuccessMessage("Google Search Console connected successfully.");
-      setError(null);
+      setTimeout(() => {
+        setSuccessMessage("Google services connected successfully.");
+        setError(null);
+      }, 0);
       refreshGsc();
+      refreshGa4();
     } else if (googleStatusParam === "error" || (errorParam && !metaStatusParam)) {
       isPostOAuth = true;
-      setError(errorParam || "Google Search Console authorization failed or was cancelled.");
+      setTimeout(() => {
+        setError(errorParam || "Google authorization failed or was cancelled.");
+      }, 0);
     }
 
     if (isPostOAuth) {
@@ -156,14 +183,16 @@ export default function IntegrationsTab() {
       window.history.replaceState({}, document.title, newUrl);
     }
 
-    fetchStatusAndAssets();
+    setTimeout(() => {
+      fetchStatusAndAssets();
+    }, 0);
 
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     };
-  }, [fetchStatusAndAssets, refreshGsc]);
+  }, [fetchStatusAndAssets, refreshGsc, refreshGa4]);
 
   // Meta Connect flow
   const handleConnect = async () => {
@@ -309,9 +338,10 @@ export default function IntegrationsTab() {
         {integrations.map((integration) => {
           const isMeta = integration.id === "int2" || integration.name === "Meta Business Suite";
           const isGsc = integration.id === "int_gsc" || integration.name === "Google Search Console";
+          const isGA4 = integration.id === "int1" || integration.name === "Google Analytics";
 
-          if (!isMeta && !isGsc) {
-            // Render non-Meta, non-GSC static mock integrations
+          if (!isMeta && !isGsc && !isGA4) {
+            // Render non-Meta, non-GSC, non-GA4 static mock integrations
             return (
               <div key={integration.id} className="p-5 border border-slate-200 rounded-xl hover:border-slate-300 transition-colors bg-white flex flex-col h-full">
                 <div className="flex items-start gap-4 mb-4">
@@ -331,6 +361,177 @@ export default function IntegrationsTab() {
                   >
                     {integration.status}
                   </button>
+                </div>
+              </div>
+            );
+          }
+
+          if (isGA4) {
+            // Render live Google Analytics 4 integration card
+            return (
+              <div key={integration.id} className="p-5 border border-slate-200 rounded-xl hover:border-slate-300 transition-colors bg-white flex flex-col h-full col-span-1 md:col-span-2">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex-shrink-0 shadow-sm flex items-center justify-center text-white ${integration.iconColor}`}>
+                      <BarChart3 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-[14px] font-bold text-slate-900 mb-0.5">{integration.name}</h4>
+                        {isLoadingGa4Status ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-400 animate-pulse">
+                            Checking...
+                          </span>
+                        ) : isGa4Connected && hasAnalyticsScope ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Connected
+                          </span>
+                        ) : isGa4Connected && !hasAnalyticsScope ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            Scope Missing
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">
+                            Disconnected
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[12.5px] text-slate-500 leading-snug mt-0.5">{integration.description}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Property Discovery & Selection Section (when connected & scope granted) */}
+                {isGa4Connected && hasAnalyticsScope && (
+                  <div className="my-3 p-4 bg-slate-50 rounded-xl border border-slate-200/80 space-y-4">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-800 pb-2 border-b border-slate-200/60">
+                      <span className="flex items-center gap-1.5">
+                        <SlidersHorizontal className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Discovered GA4 Properties</span>
+                      </span>
+                      <button
+                        onClick={() => refreshGa4()}
+                        disabled={isLoadingGa4Status || isLoadingGa4Properties}
+                        className="text-[11px] text-amber-600 hover:text-amber-800 font-semibold transition-colors disabled:opacity-50"
+                      >
+                        {isLoadingGa4Properties ? "Syncing..." : "↻ Refresh Properties"}
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 text-xs">
+                      <div
+                        onClick={() => ga4Properties.length > 0 && setIsGa4ModalOpen(true)}
+                        className={`p-3.5 bg-white rounded-xl border transition-all flex flex-col justify-between group ${
+                          ga4Properties.length > 0
+                            ? "border-slate-200 hover:border-amber-300 hover:shadow-md cursor-pointer"
+                            : "border-slate-200 opacity-80"
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-bold text-slate-800 text-[12px] flex items-center gap-1.5">
+                              <BarChart3 className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Properties ({ga4Properties.length})</span>
+                            </span>
+                            {ga4Properties.length > 0 ? (
+                              <span className="px-1.5 py-0.5 text-[9.5px] font-semibold bg-emerald-50 text-emerald-700 rounded">Available</span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 text-[9.5px] font-semibold bg-amber-50 text-amber-700 rounded">No Properties</span>
+                            )}
+                          </div>
+
+                          {/* Selected Property Display */}
+                          {ga4SelectedProperty ? (
+                            <div className="my-2 p-2.5 bg-amber-50/60 border border-amber-100 rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-amber-600" />
+                                  Selected GA4 Property
+                                </span>
+                              </div>
+                              <p className="text-[12px] font-bold text-slate-900 truncate mt-0.5" title={ga4SelectedPropertyObj?.displayName || ga4SelectedProperty}>
+                                {ga4SelectedPropertyObj?.displayName || `Property ${ga4SelectedProperty}`}
+                              </p>
+                              <p className="text-[10.5px] text-slate-500 font-mono mt-0.5">
+                                ID: {ga4SelectedProperty}
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-slate-400 italic my-2">
+                              {ga4Properties.length === 0
+                                ? "No Google Analytics 4 properties are accessible for this account."
+                                : "No property selected"}
+                            </p>
+                          )}
+                        </div>
+
+                        {ga4Properties.length > 0 && (
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-semibold text-amber-600 group-hover:text-amber-800 transition-colors">
+                            <span>Change selection</span>
+                            <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Bar */}
+                <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
+                  <div>
+                    {isGa4Connected && ga4Status?.connectedAt && (
+                      <span className="text-[11px] text-slate-400">
+                        Connected: {new Date(ga4Status.connectedAt).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+
+                  {isGa4Connected && hasAnalyticsScope ? (
+                    showGscDisconnectConfirm ? (
+                      <div className="flex items-center gap-2 bg-red-50 p-2 rounded-lg border border-red-200">
+                        <span className="text-[11.5px] font-medium text-red-700">Disconnect?</span>
+                        <button
+                          onClick={handleConfirmGscDisconnect}
+                          disabled={isGscDisconnecting}
+                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-semibold rounded text-[11px] transition-colors disabled:opacity-50"
+                        >
+                          {isGscDisconnecting ? "Disconnecting..." : "Confirm"}
+                        </button>
+                        <button
+                          onClick={() => setShowGscDisconnectConfirm(false)}
+                          disabled={isGscDisconnecting}
+                          className="px-2.5 py-1 bg-white text-slate-700 hover:bg-slate-100 font-semibold rounded text-[11px] border border-slate-200 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowGscDisconnectConfirm(true)}
+                        disabled={isGscDisconnecting || isLoadingGa4Status}
+                        className="px-4 py-2 text-[12px] font-semibold rounded-lg transition-colors bg-slate-100 text-slate-700 hover:bg-red-50 hover:text-red-600 border border-slate-200"
+                      >
+                        Disconnect
+                      </button>
+                    )
+                  ) : (
+                    <button
+                      onClick={handleGscConnect}
+                      disabled={isGscConnecting || isLoadingGa4Status}
+                      className="px-4 py-2 text-[12px] font-semibold rounded-lg transition-colors bg-amber-600 text-white hover:bg-amber-700 shadow-sm disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {isGscConnecting ? (
+                        <>
+                          <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Connecting...
+                        </>
+                      ) : isGa4Connected && !hasAnalyticsScope ? (
+                        "Grant Analytics Access"
+                      ) : (
+                        "Connect Google Analytics"
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -809,6 +1010,19 @@ export default function IntegrationsTab() {
           selectedProperty={gscSelectedProperty}
           onSelectProperty={(siteUrl) => {
             setGscSelectedProperty(siteUrl);
+          }}
+        />
+      )}
+
+      {/* GA4 Property Selection Modal */}
+      {isGa4ModalOpen && (
+        <GA4PropertySelectionModal
+          isOpen={isGa4ModalOpen}
+          onClose={() => setIsGa4ModalOpen(false)}
+          properties={ga4Properties}
+          selectedProperty={ga4SelectedProperty}
+          onSelectProperty={(propertyId) => {
+            setGa4SelectedProperty(propertyId);
           }}
         />
       )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, Megaphone, Search } from "lucide-react";
+import { LayoutDashboard, Megaphone, Search, BarChart3 } from "lucide-react";
 import FacebookIcon from "@/components/icons/FacebookIcon";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 
@@ -10,9 +10,10 @@ const tabs = [
   { id: "instagram", label: "Instagram", icon: InstagramIcon },
   { id: "ads", label: "Ads", icon: Megaphone },
   { id: "gsc", label: "Search Console", icon: Search },
+  { id: "ga4", label: "Google Analytics 4", icon: BarChart3 },
 ];
 
-export default function AnalyticsTabsNav({ activeTab, onTabChange, capabilities, gscConnected }) {
+export default function AnalyticsTabsNav({ activeTab, onTabChange, capabilities, gscConnected, ga4Connected }) {
   return (
     <div className="border-b border-slate-200 mb-6 overflow-x-auto scrollbar-none">
       <nav className="flex space-x-6 min-w-max" aria-label="Analytics Navigation">
@@ -29,6 +30,8 @@ export default function AnalyticsTabsNav({ activeTab, onTabChange, capabilities,
           } else if (tab.id === "ads" && capabilities?.ads?.available === false) {
             isUnavailable = true;
           } else if (tab.id === "gsc" && (capabilities?.gsc?.available === false || gscConnected === false)) {
+            isUnavailable = true;
+          } else if (tab.id === "ga4" && (capabilities?.ga4?.available === false || ga4Connected === false)) {
             isUnavailable = true;
           }
 

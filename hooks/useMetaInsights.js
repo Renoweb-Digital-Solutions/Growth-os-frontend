@@ -82,6 +82,12 @@ export function useMetaInsights(dateRangeDays, activeTab = "overview", selectedA
   useEffect(() => {
     let isMounted = true;
 
+    const META_TABS = ["overview", "facebook", "instagram", "ads"];
+    if (!META_TABS.includes(activeTab)) {
+      setLoading(false);
+      return;
+    }
+
     async function fetchTabData() {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
