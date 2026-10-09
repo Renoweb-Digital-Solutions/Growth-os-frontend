@@ -300,11 +300,6 @@ export function useGoogleAnalytics(initialConfig = "28d", activeTab = "overview"
   // Main status and property discovery effect
   useEffect(() => {
     let isMounted = true;
-    if (activeTab && activeTab !== "ga4") {
-      setIsLoadingStatus(false);
-      setIsLoadingProperties(false);
-      return;
-    }
 
     async function fetchStatusAndProperties() {
       setIsLoadingStatus(true);
@@ -369,7 +364,7 @@ export function useGoogleAnalytics(initialConfig = "28d", activeTab = "overview"
     return () => {
       isMounted = false;
     };
-  }, [getStorageKey, activeTab]);
+  }, [getStorageKey, retryCount]);
 
   // Fetch Analytics datasets effect (Overview, Traffic Acquisition, User Acquisition)
   useEffect(() => {

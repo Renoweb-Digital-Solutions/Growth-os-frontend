@@ -114,6 +114,8 @@ export default function GoogleAnalyticsTab({ gaState }) {
         endDate={endDate}
         selectedTrendMetric={selectedTrendMetric}
         onSelectTrendMetric={setSelectedTrendMetric}
+        selectedProperty={selectedProperty}
+        selectedPropertyObj={selectedPropertyObj}
       />
     </div>
   );

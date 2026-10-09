@@ -64,7 +64,12 @@ const SUGGESTED_CARDS = [
   },
 ];
 
-export default function GA4SuggestedForYou({ isLoading = false, dateRangeLabel = "" }) {
+export default function GA4SuggestedForYou({
+  isLoading = false,
+  dateRangeLabel = "",
+  selectedProperty,
+  selectedPropertyObj,
+}) {
   return (
     <div className="pt-4 space-y-4">
       {/* Section Heading with GA4 Dashed Divider */}
@@ -80,7 +85,11 @@ export default function GA4SuggestedForYou({ isLoading = false, dateRangeLabel =
           <div className="animate-spin w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
         </div>
       ) : (
-        <GA4InsightsCarousel cards={SUGGESTED_CARDS} />
+        <GA4InsightsCarousel
+          cards={SUGGESTED_CARDS}
+          selectedProperty={selectedProperty}
+          selectedPropertyObj={selectedPropertyObj}
+        />
       )}
     </div>
   );

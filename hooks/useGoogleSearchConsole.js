@@ -377,12 +377,6 @@ export function useGoogleSearchConsole(initialConfig = 28, activeTab = "overview
   // Main orchestration effect
   useEffect(() => {
     let isMounted = true;
-    if (activeTab && activeTab !== "gsc") {
-      setIsLoadingStatus(false);
-      setIsLoadingProperties(false);
-      setIsLoadingAnalytics(false);
-      return;
-    }
 
     async function fetchGscFlow() {
       // Abort previous in-flight requests
@@ -466,8 +460,8 @@ export function useGoogleSearchConsole(initialConfig = 28, activeTab = "overview
 
         setSelectedPropertyState(validProperty);
 
-        // Step 3: Fetch Analytics Datasets (ONLY if valid selected property exists)
-        if (!validProperty) {
+        // Step 3: Fetch Analytics Datasets (ONLY if activeTab === "gsc" or not specified/gated)
+        if (activeTab && activeTab !== "gsc" && activeTab !== "all") {
           setIsLoadingAnalytics(false);
           setAnalyticsData({
             overview: null,

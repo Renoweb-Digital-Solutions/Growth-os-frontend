@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronDown, Check, ArrowRight, AlertCircle, RefreshCw } from "lucide-react";
-import { getGA4SuggestedCard } from "@/lib/googleAnalyticsApi";
+import { getGA4SuggestedCard, getGA4ReportUrl } from "@/lib/googleAnalyticsApi";
 import GA4CardDateSelector from "./GA4CardDateSelector";
 
 const METRIC_OPTIONS = [
@@ -27,7 +27,7 @@ const PALETTE = ["#6366F1", "#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#EC4899
  * Header layout:
  * [ Key events ▼ ] by Platform
  */
-export default function GA4KeyEventsPlatformCard({ card }) {
+export default function GA4KeyEventsPlatformCard({ card, selectedProperty, selectedPropertyObj }) {
   const [selectedMetric, setSelectedMetric] = useState("keyEvents");
   const [selectedRange, setSelectedRange] = useState(card?.defaultRange || "28d");
   const [isMetricOpen, setIsMetricOpen] = useState(false);
@@ -54,18 +54,20 @@ export default function GA4KeyEventsPlatformCard({ card }) {
   const activeMetricObj =
     METRIC_OPTIONS.find((m) => m.id === selectedMetric) || METRIC_OPTIONS[0];
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (signal) => {
     setIsLoading(true);
     setError(null);
-    setTotalVal(0);
-    setRows([]);
 
     try {
-      const res = await getGA4SuggestedCard("key-events-by-platform", {
-        metric: selectedMetric,
-        rangePreset: selectedRange,
-        limit: 10,
-      });
+      const res = await getGA4SuggestedCard(
+        "key-events-by-platform",
+        {
+          metric: selectedMetric,
+          rangePreset: selectedRange,
+          limit: 10,
+        },
+        signal ? { signal } : {}
+      );
 
       if (res?.data) {
         setTotalVal(
@@ -79,6 +81,7 @@ export default function GA4KeyEventsPlatformCard({ card }) {
         setRows([]);
       }
     } catch (err) {
+      if (err.name === "AbortError") return;
       console.error("Key events by Platform API fetch error:", err);
       setError(err.message || "Unable to load platform data");
     } finally {
@@ -87,7 +90,9 @@ export default function GA4KeyEventsPlatformCard({ card }) {
   }, [selectedMetric, selectedRange]);
 
   useEffect(() => {
-    fetchData();
+    const controller = new AbortController();
+    fetchData(controller.signal);
+    return () => controller.abort();
   }, [fetchData]);
 
   const handleRangeChange = (newRange) => {
@@ -95,25 +100,18 @@ export default function GA4KeyEventsPlatformCard({ card }) {
     setSelectedRange(newRange);
   };
 
-  // Filter out blank/(not set) rows
-  const validRows = rows.filter((r) => {
-    const label = r.platform || r.dimensionValue || r.dimensionLabel || "";
-    const clean = String(label).trim();
-    return clean.length > 0 && clean.toLowerCase() !== "(not set)";
-  });
-
   const formattedTotal =
     selectedMetric === "totalRevenue"
       ? `$${totalVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       : totalVal.toLocaleString();
 
   // Donut chart segment calculation
-  const donutTotal = validRows.reduce(
+  const donutTotal = rows.reduce(
     (acc, curr) => acc + (typeof curr.current === "number" ? curr.current : Number(curr.current) || 0),
     0
   );
 
-  const segments = validRows.map((r, idx) => {
+  const segments = rows.map((r, idx) => {
     const rawName = r.platform || r.dimensionValue || r.dimensionLabel || "Other";
     const val = typeof r.current === "number" ? r.current : Number(r.current) || 0;
     const colorKey = String(rawName).toLowerCase();
@@ -194,7 +192,7 @@ export default function GA4KeyEventsPlatformCard({ card }) {
               <p className="text-[12px] font-semibold">{error}</p>
               <button
                 type="button"
-                onClick={fetchData}
+                onClick={() => fetchData()}
                 className="mt-2 text-[11px] font-bold text-indigo-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
               >
                 <RefreshCw className="w-3 h-3" /> Retry
@@ -291,13 +289,16 @@ export default function GA4KeyEventsPlatformCard({ card }) {
           onRangeChange={handleRangeChange}
         />
 
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors cursor-pointer uppercase"
+        <a
+          href={getGA4ReportUrl("platform", selectedPropertyObj || selectedProperty, selectedRange, selectedMetric, "platform")}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="View insights for Key events by Platform in Google Analytics"
+          className="inline-flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
         >
-          <span>{activeMetricObj.unit}</span>
-          <ArrowRight className="w-3 h-3" />
-        </button>
+          <span>View insights</span>
+          <ArrowRight className="w-3 h-3 shrink-0" aria-hidden="true" />
+        </a>
       </div>
     </div>
   );

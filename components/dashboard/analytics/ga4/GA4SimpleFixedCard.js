@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { ArrowRight, AlertCircle, RefreshCw, TrendingUp, TrendingDown } from "lucide-react";
-import { getGA4SuggestedCard } from "@/lib/googleAnalyticsApi";
+import { getGA4SuggestedCard, getGA4ReportUrl } from "@/lib/googleAnalyticsApi";
 import GA4CardDateSelector from "./GA4CardDateSelector";
 
 /**
@@ -18,6 +18,8 @@ export default function GA4SimpleFixedCard({
   unitLabel = "USERS",
   footerCta = "USERS",
   card,
+  selectedProperty,
+  selectedPropertyObj,
 }) {
   const [selectedRange, setSelectedRange] = useState(card?.defaultRange || "28d");
   const [isLoading, setIsLoading] = useState(true);
@@ -28,17 +30,19 @@ export default function GA4SimpleFixedCard({
 
   const title = card?.title || defaultTitle;
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (signal) => {
     setIsLoading(true);
     setError(null);
-    setTotalVal(0);
-    setRows([]);
 
     try {
-      const res = await getGA4SuggestedCard(cardKey, {
-        rangePreset: selectedRange,
-        limit: 10,
-      });
+      const res = await getGA4SuggestedCard(
+        cardKey,
+        {
+          rangePreset: selectedRange,
+          limit: 8,
+        },
+        signal ? { signal } : {}
+      );
 
       if (res?.data) {
         setTotalVal(
@@ -52,6 +56,7 @@ export default function GA4SimpleFixedCard({
         setRows([]);
       }
     } catch (err) {
+      if (err.name === "AbortError") return;
       console.error(`GA4 Card '${cardKey}' API fetch error:`, err);
       setError(err.message || "Unable to load card data");
     } finally {
@@ -60,22 +65,15 @@ export default function GA4SimpleFixedCard({
   }, [cardKey, selectedRange]);
 
   useEffect(() => {
-    fetchData();
+    const controller = new AbortController();
+    fetchData(controller.signal);
+    return () => controller.abort();
   }, [fetchData]);
 
   const handleRangeChange = (newRange) => {
     if (newRange === selectedRange) return;
     setSelectedRange(newRange);
   };
-
-  // Filter out "(not set)" or blank labels, then slice to top 8 valid rows
-  const validRows = rows
-    .filter((r) => {
-      const label = r.dimensionLabel || r.dimensionValue || r.dimension || "";
-      const clean = String(label).trim();
-      return clean.length > 0 && clean.toLowerCase() !== "(not set)";
-    })
-    .slice(0, 8);
 
   return (
     <div className="w-[320px] sm:w-[340px] shrink-0 h-[410px] bg-white border border-slate-200 rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow select-none relative">
@@ -108,7 +106,7 @@ export default function GA4SimpleFixedCard({
           </div>
         )}
 
-        {/* Ranked Top 8 Rows */}
+        {/* Ranked Top Rows */}
         <div className="mt-1">
           {isLoading ? (
             <div className="h-[230px] flex flex-col justify-center space-y-1.5 p-2 bg-slate-50/50 rounded-xl border border-slate-100">
@@ -125,15 +123,15 @@ export default function GA4SimpleFixedCard({
               <p className="text-[12px] font-semibold">{error}</p>
               <button
                 type="button"
-                onClick={fetchData}
+                onClick={() => fetchData()}
                 className="mt-2 text-[11px] font-bold text-indigo-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
               >
                 <RefreshCw className="w-3 h-3" /> Retry
               </button>
             </div>
-          ) : validRows.length > 0 ? (
+          ) : rows.length > 0 ? (
             <div className="space-y-1 pt-0.5">
-              {validRows.map((row, idx) => {
+              {rows.map((row, idx) => {
                 const dimLabel =
                   row.dimensionLabel || row.dimensionValue || row.dimension || "(not set)";
                 const currentCount =
@@ -149,7 +147,7 @@ export default function GA4SimpleFixedCard({
 
                 return (
                   <div
-                    key={`row-${idx}`}
+                    key={`row-${row.dimensionValue || idx}`}
                     className="flex items-center justify-between p-1 px-2 rounded-lg bg-slate-50/70 hover:bg-slate-100/80 transition-colors text-[11px]"
                   >
                     <div className="flex items-center gap-2 min-w-0 pr-2">
@@ -210,13 +208,16 @@ export default function GA4SimpleFixedCard({
         />
 
         {/* Action Link */}
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors cursor-pointer uppercase"
+        <a
+          href={getGA4ReportUrl(cardKey || card?.vizType || card?.id, selectedPropertyObj || selectedProperty, selectedRange)}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`View insights for ${title} in Google Analytics`}
+          className="inline-flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
         >
-          <span>{footerCta}</span>
-          <ArrowRight className="w-3 h-3" />
-        </button>
+          <span>View insights</span>
+          <ArrowRight className="w-3 h-3 shrink-0" aria-hidden="true" />
+        </a>
       </div>
     </div>
   );
