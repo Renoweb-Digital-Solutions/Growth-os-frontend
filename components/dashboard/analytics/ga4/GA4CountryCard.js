@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronDown, Check, ArrowRight, AlertCircle, RefreshCw, TrendingUp, TrendingDown } from "lucide-react";
-import { getGA4SuggestedCard } from "@/lib/googleAnalyticsApi";
+import { getGA4SuggestedCard, getGA4ReportUrl } from "@/lib/googleAnalyticsApi";
 import GA4CardDateSelector from "./GA4CardDateSelector";
 
 const METRIC_OPTIONS = [
@@ -12,34 +12,30 @@ const METRIC_OPTIONS = [
 ];
 
 const DIMENSION_OPTIONS = [
-  { id: "countryId", label: "Country ID", shortLabel: "Country ID" },
   { id: "country", label: "Country", shortLabel: "Country" },
+  { id: "countryId", label: "Country ID", shortLabel: "Country ID" },
 ];
 
 /**
- * Extracts clean full country name from row object.
- * Returns null if the value is blank, null, or "(not set)".
+ * Extracts clean display string from row object returned by backend.
+ * Uses dimensionLabel if present, falling back to dimensionValue or dimension.
  */
 function getCountryDisplayName(row) {
-  if (!row) return null;
+  if (!row) return "";
   const label = row.dimensionLabel || row.dimensionValue || row.dimension || "";
-  const cleanLabel = String(label).trim();
-  if (!cleanLabel || cleanLabel.toLowerCase() === "(not set)") {
-    return null;
-  }
-  return cleanLabel;
+  return String(label).trim();
 }
 
 /**
- * GA4CountryCard renders the GA4 "Active users by Country" Home Widget.
+ * GA4CountryCard renders the GA4 "Active users by Country" Suggested Card.
  * Header layout:
- * [ Active users ▼ ] by [ Country ID ▼ ]
+ * [ Active users ▼ ] by [ Country ▼ ]
  *
  * Connected directly to: GET /api/google/analytics/insights/suggested-cards/active-users-by-country
  */
-export default function GA4CountryCard({ card }) {
+export default function GA4CountryCard({ card, selectedProperty, selectedPropertyObj }) {
   const [selectedMetric, setSelectedMetric] = useState("activeUsers");
-  const [selectedDimension, setSelectedDimension] = useState("countryId");
+  const [selectedDimension, setSelectedDimension] = useState("country");
   const [selectedRange, setSelectedRange] = useState(card?.defaultRange || "28d");
 
   const [isMetricOpen, setIsMetricOpen] = useState(false);
@@ -73,17 +69,22 @@ export default function GA4CountryCard({ card }) {
   const activeDimObj =
     DIMENSION_OPTIONS.find((d) => d.id === selectedDimension) || DIMENSION_OPTIONS[0];
 
-  const fetchData = useCallback(async () => {
+  // Primary data-fetching hook with AbortController for race-condition prevention
+  const fetchData = useCallback(async (signal) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const res = await getGA4SuggestedCard("active-users-by-country", {
-        metric: selectedMetric,
-        dimension: selectedDimension,
-        rangePreset: selectedRange,
-        limit: 10, // Request up to 10 so filtering (not set) yields top 7 valid countries
-      });
+      const res = await getGA4SuggestedCard(
+        "active-users-by-country",
+        {
+          metric: selectedMetric,
+          dimension: selectedDimension,
+          rangePreset: selectedRange,
+          limit: 7,
+        },
+        signal ? { signal } : {}
+      );
 
       if (res?.data) {
         setTotalVal(
@@ -97,6 +98,7 @@ export default function GA4CountryCard({ card }) {
         setRows([]);
       }
     } catch (err) {
+      if (err.name === "AbortError") return;
       console.error("Country Card API fetch error:", err);
       setError(err.message || "Unable to load country data");
     } finally {
@@ -105,18 +107,15 @@ export default function GA4CountryCard({ card }) {
   }, [selectedMetric, selectedDimension, selectedRange]);
 
   useEffect(() => {
-    fetchData();
+    const controller = new AbortController();
+    fetchData(controller.signal);
+    return () => controller.abort();
   }, [fetchData]);
 
   const handleRangeChange = (newRange) => {
     if (newRange === selectedRange) return;
     setSelectedRange(newRange);
   };
-
-  // Filter out (not set) or blank labels, then take maximum 7 valid rows
-  const validCountryRows = rows
-    .filter((row) => getCountryDisplayName(row) !== null)
-    .slice(0, 7);
 
   return (
     <div className="w-[320px] sm:w-[340px] shrink-0 h-[410px] bg-white border border-slate-200 rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow select-none relative">
@@ -211,7 +210,7 @@ export default function GA4CountryCard({ card }) {
           </div>
         )}
 
-        {/* Ranked Country Rows (Max 7 Rows, Full Country Names Only, No (not set), No Country Code Badges) */}
+        {/* Ranked Country Rows (Max 7 Rows returned directly by Backend) */}
         <div className="mt-0.5">
           {isLoading ? (
             <div className="h-[230px] flex flex-col justify-center space-y-2 p-2 bg-slate-50/50 rounded-xl border border-slate-100">
@@ -225,15 +224,15 @@ export default function GA4CountryCard({ card }) {
               <p className="text-[12px] font-semibold">{error}</p>
               <button
                 type="button"
-                onClick={fetchData}
+                onClick={() => fetchData()}
                 className="mt-2 text-[11px] font-bold text-indigo-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
               >
                 <RefreshCw className="w-3 h-3" /> Retry
               </button>
             </div>
-          ) : validCountryRows.length > 0 ? (
+          ) : rows.length > 0 ? (
             <div className="space-y-1 overflow-hidden">
-              {validCountryRows.map((row, idx) => {
+              {rows.map((row, idx) => {
                 const countryDisplayName = getCountryDisplayName(row);
                 const currentCount =
                   typeof row.current === "number"
@@ -248,7 +247,7 @@ export default function GA4CountryCard({ card }) {
 
                 return (
                   <div
-                    key={`country-row-${idx}`}
+                    key={`country-row-${row.dimensionValue || idx}`}
                     className="flex items-center justify-between p-1 px-2 rounded-lg bg-slate-50/70 hover:bg-slate-100/80 transition-colors text-[11px]"
                   >
                     <div className="flex items-center gap-2 min-w-0 pr-2">
@@ -257,7 +256,7 @@ export default function GA4CountryCard({ card }) {
                         {idx + 1}
                       </span>
 
-                      {/* Full Country Name Only — NO country code badges (IN, US, SG) */}
+                      {/* Display Label (Full Country Name when Country selected, Country Code when Country ID selected) */}
                       <span className="text-slate-700 font-semibold truncate" title={countryDisplayName}>
                         {countryDisplayName}
                       </span>
@@ -307,13 +306,16 @@ export default function GA4CountryCard({ card }) {
         />
 
         {/* Action Link */}
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors cursor-pointer"
+        <a
+          href={getGA4ReportUrl("country", selectedPropertyObj || selectedProperty, selectedRange, selectedMetric, selectedDimension)}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="View insights for Active users by Country in Google Analytics"
+          className="inline-flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
         >
-          <span>USERS</span>
-          <ArrowRight className="w-3 h-3" />
-        </button>
+          <span>View insights</span>
+          <ArrowRight className="w-3 h-3 shrink-0" aria-hidden="true" />
+        </a>
       </div>
     </div>
   );

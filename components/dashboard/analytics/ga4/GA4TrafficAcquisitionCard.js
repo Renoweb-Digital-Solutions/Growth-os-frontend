@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronDown, Check, ArrowRight, AlertCircle, TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
-import { getGA4TrafficAcquisition } from "@/lib/googleAnalyticsApi";
+import { getGA4TrafficAcquisition, getGA4ReportUrl } from "@/lib/googleAnalyticsApi";
 import GA4CardDateSelector from "./GA4CardDateSelector";
 
 const METRIC_OPTIONS = [
@@ -60,7 +60,7 @@ function parseRowVal(row) {
  *
  * Connected directly to: GET /api/google/analytics/insights/acquisition
  */
-export default function GA4TrafficAcquisitionCard({ card }) {
+export default function GA4TrafficAcquisitionCard({ card, selectedProperty, selectedPropertyObj }) {
   const [selectedMetric, setSelectedMetric] = useState("sessions");
   const [selectedDimension, setSelectedDimension] = useState("sessionPrimaryChannelGroup");
   const [selectedRange, setSelectedRange] = useState(card?.defaultRange || "28d");
@@ -96,27 +96,31 @@ export default function GA4TrafficAcquisitionCard({ card }) {
   const activeDimObj =
     DIMENSION_OPTIONS.find((d) => d.id === selectedDimension) || DIMENSION_OPTIONS[0];
 
-  // Primary API fetcher
-  const fetchData = useCallback(async () => {
+  // Primary API fetcher with AbortController for race-condition prevention
+  const fetchData = useCallback(async (signal) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const res = await getGA4TrafficAcquisition({
-        metric: selectedMetric,
-        dimension: activeDimObj.apiKey,
-        rangePreset: selectedRange,
-        limit: 5,
-      });
+      const res = await getGA4TrafficAcquisition(
+        {
+          metric: selectedMetric,
+          dimension: activeDimObj.apiKey,
+          rangePreset: selectedRange,
+          limit: 5,
+        },
+        signal ? { signal } : {}
+      );
 
       if (res?.data) {
-        setTotalVal(res.data.total !== undefined ? res.data.total : "0");
+        setTotalVal(res.data.total !== undefined && res.data.total !== null ? res.data.total : "0");
         setRows(Array.isArray(res.data.rows) ? res.data.rows : []);
       } else {
         setTotalVal("0");
         setRows([]);
       }
     } catch (err) {
+      if (err.name === "AbortError") return;
       console.error("Traffic Acquisition API fetch error:", err);
       setError(err.message || "Unable to load traffic acquisition data");
     } finally {
@@ -125,7 +129,9 @@ export default function GA4TrafficAcquisitionCard({ card }) {
   }, [selectedMetric, activeDimObj.apiKey, selectedRange]);
 
   useEffect(() => {
-    fetchData();
+    const controller = new AbortController();
+    fetchData(controller.signal);
+    return () => controller.abort();
   }, [fetchData]);
 
   // Handle card date selector change
@@ -249,7 +255,7 @@ export default function GA4TrafficAcquisitionCard({ card }) {
               <p className="text-[12px] font-semibold">{error}</p>
               <button
                 type="button"
-                onClick={fetchData}
+                onClick={() => fetchData()}
                 className="mt-2 text-[11px] font-bold text-indigo-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
               >
                 <RefreshCw className="w-3 h-3" /> Retry
@@ -257,8 +263,8 @@ export default function GA4TrafficAcquisitionCard({ card }) {
             </div>
           ) : rows.length > 0 ? (
             <div className="space-y-2.5 pt-1">
-              {rows.slice(0, 4).map((row, idx) => {
-                const dimName = row.dimension || row.label || row.dimensionValue || "(not set)";
+              {rows.slice(0, 5).map((row, idx) => {
+                const dimName = row.dimension || row.label || row.dimensionValue || row.dimensionLabel || "(not set)";
                 const valNum = parseRowVal(row);
                 const valDisplay = row.value !== undefined ? String(row.value) : valNum.toLocaleString();
                 const widthPct = Math.max(6, Math.round((valNum / maxVal) * 100));
@@ -270,7 +276,9 @@ export default function GA4TrafficAcquisitionCard({ card }) {
                     ? "bg-blue-500"
                     : idx === 2
                     ? "bg-sky-500"
-                    : "bg-emerald-500";
+                    : idx === 3
+                    ? "bg-emerald-500"
+                    : "bg-violet-500";
 
                 // Parse comparison pct change safely
                 const changePct =
@@ -280,7 +288,7 @@ export default function GA4TrafficAcquisitionCard({ card }) {
                 const hasChange = changePct !== null && !isNaN(changePct) && isFinite(changePct);
 
                 return (
-                  <div key={`acq-row-${idx}`} className="space-y-1">
+                  <div key={`acq-row-${row.dimensionValue || idx}`} className="space-y-1">
                     <div className="flex items-center justify-between text-[11.5px]">
                       <span
                         className="text-slate-700 font-semibold truncate max-w-[170px]"
@@ -338,13 +346,16 @@ export default function GA4TrafficAcquisitionCard({ card }) {
         />
 
         {/* Action Link */}
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors cursor-pointer"
+        <a
+          href={getGA4ReportUrl("trafficAcquisition", selectedPropertyObj || selectedProperty, selectedRange, selectedMetric, activeDimObj?.apiKey || selectedDimension)}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="View insights for Sessions by Session primary channel group in Google Analytics"
+          className="inline-flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
         >
-          <span>View traffic acquisition</span>
-          <ArrowRight className="w-3 h-3" />
-        </button>
+          <span>View insights</span>
+          <ArrowRight className="w-3 h-3 shrink-0" aria-hidden="true" />
+        </a>
       </div>
     </div>
   );
