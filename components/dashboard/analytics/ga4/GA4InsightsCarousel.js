@@ -7,7 +7,7 @@ import GA4InsightCard from "./GA4InsightCard";
 /**
  * GA4InsightsCarousel renders a horizontal card carousel with circular left/right navigation arrows.
  */
-export default function GA4InsightsCarousel({ cards = [] }) {
+export default function GA4InsightsCarousel({ cards = [], selectedProperty, selectedPropertyObj }) {
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -78,7 +78,12 @@ export default function GA4InsightsCarousel({ cards = [] }) {
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         {cards.map((card) => (
-          <GA4InsightCard key={card.id} card={card} />
+          <GA4InsightCard
+            key={card.id}
+            card={card}
+            selectedProperty={selectedProperty}
+            selectedPropertyObj={selectedPropertyObj}
+          />
         ))}
       </div>
     </div>

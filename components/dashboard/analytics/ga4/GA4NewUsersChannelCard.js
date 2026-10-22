@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronDown, Check, ArrowRight, AlertCircle, RefreshCw } from "lucide-react";
-import { getGA4SuggestedCard } from "@/lib/googleAnalyticsApi";
+import { getGA4SuggestedCard, getGA4ReportUrl } from "@/lib/googleAnalyticsApi";
 import GA4CardDateSelector, { getPresetLabel } from "./GA4CardDateSelector";
 
 const DIMENSION_OPTIONS = [
@@ -50,7 +50,7 @@ const ROW_COLORS = [
  * Line 1: New users by
  * Line 2: [ First user primary channel group (Default channel group) ▼ ]
  */
-export default function GA4NewUsersChannelCard({ card }) {
+export default function GA4NewUsersChannelCard({ card, selectedProperty, selectedPropertyObj }) {
   const [selectedDimension, setSelectedDimension] = useState("firstUserPrimaryChannelGroup");
   const [selectedRange, setSelectedRange] = useState(card?.defaultRange || "28d");
   const [isDimOpen, setIsDimOpen] = useState(false);
@@ -77,18 +77,20 @@ export default function GA4NewUsersChannelCard({ card }) {
   const activeDimObj =
     DIMENSION_OPTIONS.find((d) => d.id === selectedDimension) || DIMENSION_OPTIONS[0];
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (signal) => {
     setIsLoading(true);
     setError(null);
-    setTotalVal(0);
-    setRows([]);
 
     try {
-      const res = await getGA4SuggestedCard("new-users-by-channel", {
-        dimension: selectedDimension,
-        rangePreset: selectedRange,
-        limit: 10,
-      });
+      const res = await getGA4SuggestedCard(
+        "new-users-by-channel",
+        {
+          dimension: selectedDimension,
+          rangePreset: selectedRange,
+          limit: 8,
+        },
+        signal ? { signal } : {}
+      );
 
       if (res?.data) {
         setTotalVal(
@@ -102,6 +104,7 @@ export default function GA4NewUsersChannelCard({ card }) {
         setRows([]);
       }
     } catch (err) {
+      if (err.name === "AbortError") return;
       console.error("New users by Channel API fetch error:", err);
       setError(err.message || "Unable to load channel data");
     } finally {
@@ -110,7 +113,9 @@ export default function GA4NewUsersChannelCard({ card }) {
   }, [selectedDimension, selectedRange]);
 
   useEffect(() => {
-    fetchData();
+    const controller = new AbortController();
+    fetchData(controller.signal);
+    return () => controller.abort();
   }, [fetchData]);
 
   const handleRangeChange = (newRange) => {
@@ -118,22 +123,11 @@ export default function GA4NewUsersChannelCard({ card }) {
     setSelectedRange(newRange);
   };
 
-  // Filter out (not set) or blank labels, take up to 8 real rows
-  const validRows = rows
-    .filter((r) => {
-      const label = r.dimensionValue || r.dimensionLabel || r.dimension || "";
-      const clean = String(label).trim();
-      return clean.length > 0 && clean.toLowerCase() !== "(not set)";
-    })
-    .slice(0, 8);
-
-  const allVals = validRows.flatMap((r) => [
+  const allVals = rows.flatMap((r) => [
     typeof r.current === "number" ? r.current : Number(r.current) || 0,
     typeof r.previous === "number" ? r.previous : Number(r.previous) || 0,
   ]);
   const maxVal = Math.max(...allVals, 1);
-
-  const currentPeriodText = getPresetLabel(selectedRange);
 
   return (
     <div className="w-[320px] sm:w-[340px] shrink-0 h-[410px] bg-white border border-slate-200 rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow select-none relative">
@@ -210,15 +204,15 @@ export default function GA4NewUsersChannelCard({ card }) {
               <p className="text-[12px] font-semibold">{error}</p>
               <button
                 type="button"
-                onClick={fetchData}
+                onClick={() => fetchData()}
                 className="mt-2 text-[11px] font-bold text-indigo-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
               >
                 <RefreshCw className="w-3 h-3" /> Retry
               </button>
             </div>
-          ) : validRows.length > 0 ? (
+          ) : rows.length > 0 ? (
             <div className="space-y-1.5 max-h-[210px] overflow-y-auto pr-0.5 scrollbar-light">
-              {validRows.map((row, idx) => {
+              {rows.map((row, idx) => {
                 const label = row.dimensionValue || row.dimensionLabel || row.dimension || "(not set)";
                 const currentVal = typeof row.current === "number" ? row.current : Number(row.current) || 0;
                 const prevVal = typeof row.previous === "number" ? row.previous : Number(row.previous) || 0;
@@ -228,7 +222,7 @@ export default function GA4NewUsersChannelCard({ card }) {
                 const barColor = ROW_COLORS[idx % ROW_COLORS.length];
 
                 return (
-                  <div key={`row-${idx}`} className="space-y-0.5 text-[10.5px]">
+                  <div key={`row-${row.dimensionValue || idx}`} className="space-y-0.5 text-[10.5px]">
                     <div className="flex items-center justify-between text-slate-700 font-medium">
                       <span className="truncate max-w-[190px]" title={label}>
                         {label}
@@ -284,13 +278,16 @@ export default function GA4NewUsersChannelCard({ card }) {
           onRangeChange={handleRangeChange}
         />
 
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors cursor-pointer uppercase text-[10.5px]"
+        <a
+          href={getGA4ReportUrl("firstUserChannel", selectedPropertyObj || selectedProperty, selectedRange, "newUsers", selectedDimension)}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="View insights for New users by First user primary channel group in Google Analytics"
+          className="inline-flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer text-[11px]"
         >
-          <span>VIEW USER ACQUISITION</span>
-          <ArrowRight className="w-3 h-3" />
-        </button>
+          <span>View insights</span>
+          <ArrowRight className="w-3 h-3 shrink-0" aria-hidden="true" />
+        </a>
       </div>
     </div>
   );

@@ -54,7 +54,7 @@ export default function IntegrationsTab() {
     setSelectedProperty: setGscSelectedProperty,
     isLoadingProperties: isLoadingGscProperties,
     refresh: refreshGsc,
-  } = useGoogleSearchConsole();
+  } = useGoogleSearchConsole(28, "integrations");
 
   const [isGscConnecting, setIsGscConnecting] = useState(false);
   const [isGscDisconnecting, setIsGscDisconnecting] = useState(false);
@@ -73,8 +73,9 @@ export default function IntegrationsTab() {
     selectProperty: setGa4SelectedProperty,
     isLoadingProperties: isLoadingGa4Properties,
     refresh: refreshGa4,
-  } = useGoogleAnalytics();
+  } = useGoogleAnalytics("28d", "integrations");
 
+  const [showGa4DisconnectConfirm, setShowGa4DisconnectConfirm] = useState(false);
   const [isGa4ModalOpen, setIsGa4ModalOpen] = useState(false);
 
   const abortControllerRef = useRef(null);
@@ -487,7 +488,7 @@ export default function IntegrationsTab() {
                   </div>
 
                   {isGa4Connected && hasAnalyticsScope ? (
-                    showGscDisconnectConfirm ? (
+                    showGa4DisconnectConfirm ? (
                       <div className="flex items-center gap-2 bg-red-50 p-2 rounded-lg border border-red-200">
                         <span className="text-[11.5px] font-medium text-red-700">Disconnect?</span>
                         <button
@@ -498,7 +499,7 @@ export default function IntegrationsTab() {
                           {isGscDisconnecting ? "Disconnecting..." : "Confirm"}
                         </button>
                         <button
-                          onClick={() => setShowGscDisconnectConfirm(false)}
+                          onClick={() => setShowGa4DisconnectConfirm(false)}
                           disabled={isGscDisconnecting}
                           className="px-2.5 py-1 bg-white text-slate-700 hover:bg-slate-100 font-semibold rounded text-[11px] border border-slate-200 transition-colors"
                         >
@@ -507,7 +508,7 @@ export default function IntegrationsTab() {
                       </div>
                     ) : (
                       <button
-                        onClick={() => setShowGscDisconnectConfirm(true)}
+                        onClick={() => setShowGa4DisconnectConfirm(true)}
                         disabled={isGscDisconnecting || isLoadingGa4Status}
                         className="px-4 py-2 text-[12px] font-semibold rounded-lg transition-colors bg-slate-100 text-slate-700 hover:bg-red-50 hover:text-red-600 border border-slate-200"
                       >

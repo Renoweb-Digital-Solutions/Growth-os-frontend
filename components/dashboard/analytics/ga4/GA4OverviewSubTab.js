@@ -563,6 +563,8 @@ export default function GA4OverviewSubTab({
   endDate,
   selectedTrendMetric = "activeUsers",
   onSelectTrendMetric,
+  selectedProperty,
+  selectedPropertyObj,
 }) {
   const [selectedMetricKeys, setSelectedMetricKeys] = useState([
     "activeUsers",
@@ -852,7 +854,12 @@ export default function GA4OverviewSubTab({
       </div>
 
       {/* GA4 "Suggested for You" Horizontal Carousel Section */}
-      <GA4SuggestedForYou isLoading={isLoading} dateRangeLabel={dateRangeLabelText} />
+      <GA4SuggestedForYou
+        isLoading={isLoading}
+        dateRangeLabel={dateRangeLabelText}
+        selectedProperty={selectedProperty}
+        selectedPropertyObj={selectedPropertyObj}
+      />
     </div>
   );
 }

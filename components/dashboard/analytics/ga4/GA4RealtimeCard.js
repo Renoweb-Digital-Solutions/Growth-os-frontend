@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronDown, Check, ArrowRight, AlertCircle, RefreshCw } from "lucide-react";
-import { getGA4Realtime } from "@/lib/googleAnalyticsApi";
+import { getGA4Realtime, getGA4ReportUrl } from "@/lib/googleAnalyticsApi";
 
 const METRIC_OPTIONS = [
   { id: "activeUsers", label: "Active users", supported: true, subtitle: "Active users per minute" },
@@ -33,7 +33,7 @@ const DIMENSION_OPTIONS = [
  * - Disables unsupported metrics (newUsers) & unsupported dimensions (firstUserCampaign/Medium/Source/Platform).
  * - No date range dropdown in footer.
  */
-export default function GA4RealtimeCard() {
+export default function GA4RealtimeCard({ card, selectedProperty, selectedPropertyObj }) {
   const [selectedMetric, setSelectedMetric] = useState("activeUsers");
   const [selectedDimension, setSelectedDimension] = useState("country");
 
@@ -70,9 +70,9 @@ export default function GA4RealtimeCard() {
   const activeDimObj =
     DIMENSION_OPTIONS.find((d) => d.id === selectedDimension) || DIMENSION_OPTIONS[0];
 
-  // Realtime Data Fetcher
+  // Realtime Data Fetcher with AbortController signal
   const fetchData = useCallback(
-    async (isInitial = false) => {
+    async (isInitial = false, signal = null) => {
       if (!activeMetricObj.supported || !activeDimObj.supported) {
         return;
       }
@@ -85,9 +85,10 @@ export default function GA4RealtimeCard() {
       setError(null);
 
       try {
+        const fetchOpts = signal ? { signal } : {};
         const [resMinutes, resBreakdown] = await Promise.all([
-          getGA4Realtime({ metric: selectedMetric, dimension: "minutesAgo" }),
-          getGA4Realtime({ metric: selectedMetric, dimension: selectedDimension }),
+          getGA4Realtime({ metric: selectedMetric, dimension: "minutesAgo" }, fetchOpts),
+          getGA4Realtime({ metric: selectedMetric, dimension: selectedDimension }, fetchOpts),
         ]);
 
         if (resMinutes?.success && resMinutes?.data) {
@@ -108,6 +109,7 @@ export default function GA4RealtimeCard() {
           setBreakdownRows([]);
         }
       } catch (err) {
+        if (err.name === "AbortError") return;
         console.error("Failed to fetch GA4 Realtime data:", err);
         setError(err.message || "Unable to load realtime data");
       } finally {
@@ -118,15 +120,20 @@ export default function GA4RealtimeCard() {
     [selectedMetric, selectedDimension, activeMetricObj.supported, activeDimObj.supported]
   );
 
-  // Initial load + 20s polling interval
+  // Initial load + 20s polling interval with AbortController cleanup
   useEffect(() => {
-    fetchData(true);
+    let controller = new AbortController();
+    fetchData(true, controller.signal);
 
     const intervalId = setInterval(() => {
-      fetchData(false);
+      controller = new AbortController();
+      fetchData(false, controller.signal);
     }, 20000);
 
-    return () => clearInterval(intervalId);
+    return () => {
+      controller.abort();
+      clearInterval(intervalId);
+    };
   }, [fetchData]);
 
   const maxSparkVal = Math.max(...minuteRows.map((r) => r.value || 0), 1);
@@ -339,13 +346,16 @@ export default function GA4RealtimeCard() {
 
       {/* Card Footer — NO Date Range Selector, Only Action Link */}
       <div className="pt-3 border-t border-slate-100 flex items-center justify-end text-[11px]">
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors cursor-pointer"
+        <a
+          href={getGA4ReportUrl("realtime", selectedPropertyObj || selectedProperty)}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="View insights for Active users in last 30 minutes in Google Analytics"
+          className="inline-flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
         >
-          <span>View Realtime</span>
-          <ArrowRight className="w-3 h-3" />
-        </button>
+          <span>View insights</span>
+          <ArrowRight className="w-3 h-3 shrink-0" aria-hidden="true" />
+        </a>
       </div>
     </div>
   );
