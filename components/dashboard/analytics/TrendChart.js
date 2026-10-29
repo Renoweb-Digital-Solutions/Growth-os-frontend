@@ -13,7 +13,7 @@ import {
 
 const seriesDefs = [
   { key: "fb_engagements", label: "FB Engagements", color: "#6366F1", platform: "facebook" },
-  { key: "fb_follows", label: "FB Daily Follows", color: "#3B82F6", platform: "facebook" },
+  { key: "fb_follows", label: "FB Page Follows", color: "#3B82F6", platform: "facebook" },
   { key: "ig_reach", label: "IG Reach", color: "#EC4899", platform: "instagram" },
   { key: "ads_spend", label: "Ads Spend ($)", color: "#F59E0B", platform: "ads" },
   { key: "ads_clicks", label: "Ads Clicks", color: "#10B981", platform: "ads" },
@@ -21,9 +21,10 @@ const seriesDefs = [
 
 function CustomTooltip({ active, payload, label }) {
   if (active && payload && payload.length) {
+    const displayLabel = payload[0]?.payload?.dateLabel || label;
     return (
       <div className="bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl p-3.5 shadow-xl min-w-[160px]">
-        <p className="text-[12px] font-semibold text-slate-700 mb-2">{label}</p>
+        <p className="text-[12px] font-semibold text-slate-700 mb-2">{displayLabel}</p>
         {payload.map((item) => (
           <div key={item.dataKey} className="flex items-center justify-between gap-4 mb-1">
             <span className="flex items-center gap-1.5 text-[11.5px] text-slate-500">
@@ -73,21 +74,43 @@ export default function TrendChart({ data, adsData, capabilities, loading, activ
       : !isSocialAvail && !isIgAvail && !isAdsAvail;
 
   // Allowed platforms for current tab
-  const allowedPlatforms =
-    activeTab === "facebook"
-      ? ["facebook"]
-      : activeTab === "instagram"
-      ? ["instagram"]
-      : activeTab === "ads"
-      ? ["ads"]
-      : ["facebook", "instagram", "ads"];
+  const allowedPlatforms = useMemo(() => {
+    if (activeTab === "facebook") return ["facebook"];
+    if (activeTab === "instagram") return ["instagram"];
+    if (activeTab === "ads") return ["ads"];
+    return ["facebook", "instagram", "ads"];
+  }, [activeTab]);
 
   const chartData = useMemo(() => {
     const dateMap = {};
 
-    const formatDate = (isoString) => {
+    const getIsoDateKey = (isoString) => {
+      try {
+        const d = new Date(isoString);
+        if (isNaN(d.getTime())) return null;
+        return d.toISOString().split("T")[0];
+      } catch (e) {
+        return null;
+      }
+    };
+
+    const formatDateLabel = (isoString) => {
       const d = new Date(isoString);
       return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    };
+
+    const getOrCreateEntry = (isoString) => {
+      const key = getIsoDateKey(isoString);
+      if (!key) return null;
+      if (!dateMap[key]) {
+        const d = new Date(isoString);
+        dateMap[key] = {
+          dateKey: key,
+          dateLabel: formatDateLabel(isoString),
+          dateMs: d.getTime(),
+        };
+      }
+      return dateMap[key];
     };
 
     // Extract FB metrics (only if facebook platform is allowed & available)
@@ -95,21 +118,21 @@ export default function TrendChart({ data, adsData, capabilities, loading, activ
       const fbEngagements = data.page.insights.find((i) => i.name === "page_post_engagements");
       if (fbEngagements && Array.isArray(fbEngagements.values)) {
         fbEngagements.values.forEach((v) => {
-          if (v.endTime && v.value !== null && v.value !== undefined) {
-            const dateLabel = formatDate(v.endTime);
-            if (!dateMap[dateLabel]) dateMap[dateLabel] = { dateLabel, dateMs: new Date(v.endTime).getTime() };
-            dateMap[dateLabel].fb_engagements = v.value;
+          const rawTime = v.endTime || v.end_time || v.timestamp || v.date;
+          if (rawTime && v.value !== null && v.value !== undefined && Number.isFinite(Number(v.value))) {
+            const entry = getOrCreateEntry(rawTime);
+            if (entry) entry.fb_engagements = Number(v.value);
           }
         });
       }
 
-      const fbFollows = data.page.insights.find((i) => i.name === "page_daily_follows");
+      const fbFollows = data.page.insights.find((i) => i.name === "page_follows" || i.name === "page_daily_follows");
       if (fbFollows && Array.isArray(fbFollows.values)) {
         fbFollows.values.forEach((v) => {
-          if (v.endTime && v.value !== null && v.value !== undefined) {
-            const dateLabel = formatDate(v.endTime);
-            if (!dateMap[dateLabel]) dateMap[dateLabel] = { dateLabel, dateMs: new Date(v.endTime).getTime() };
-            dateMap[dateLabel].fb_follows = v.value;
+          const rawTime = v.endTime || v.end_time || v.timestamp || v.date;
+          if (rawTime && v.value !== null && v.value !== undefined && Number.isFinite(Number(v.value))) {
+            const entry = getOrCreateEntry(rawTime);
+            if (entry) entry.fb_follows = Number(v.value);
           }
         });
       }
@@ -120,10 +143,9 @@ export default function TrendChart({ data, adsData, capabilities, loading, activ
       const igReach = data.instagram.insights.find((i) => i.name === "reach");
       if (igReach && Array.isArray(igReach.values)) {
         igReach.values.forEach((v) => {
-          if (v.endTime && v.value !== null && v.value !== undefined) {
-            const dateLabel = formatDate(v.endTime);
-            if (!dateMap[dateLabel]) dateMap[dateLabel] = { dateLabel, dateMs: new Date(v.endTime).getTime() };
-            dateMap[dateLabel].ig_reach = v.value;
+          if (v.endTime && v.value !== null && v.value !== undefined && Number.isFinite(Number(v.value))) {
+            const entry = getOrCreateEntry(v.endTime);
+            if (entry) entry.ig_reach = Number(v.value);
           }
         });
       }
@@ -134,10 +156,15 @@ export default function TrendChart({ data, adsData, capabilities, loading, activ
       adsData.insights.forEach((item) => {
         const endTime = item.date_stop || item.date_start;
         if (endTime) {
-          const dateLabel = formatDate(endTime);
-          if (!dateMap[dateLabel]) dateMap[dateLabel] = { dateLabel, dateMs: new Date(endTime).getTime() };
-          if (item.spend !== undefined && item.spend !== null) dateMap[dateLabel].ads_spend = Number(item.spend);
-          if (item.clicks !== undefined && item.clicks !== null) dateMap[dateLabel].ads_clicks = Number(item.clicks);
+          const entry = getOrCreateEntry(endTime);
+          if (entry) {
+            if (item.spend !== undefined && item.spend !== null && Number.isFinite(Number(item.spend))) {
+              entry.ads_spend = Number(item.spend);
+            }
+            if (item.clicks !== undefined && item.clicks !== null && Number.isFinite(Number(item.clicks))) {
+              entry.ads_clicks = Number(item.clicks);
+            }
+          }
         }
       });
     }
@@ -147,7 +174,7 @@ export default function TrendChart({ data, adsData, capabilities, loading, activ
       ...d,
       label: i % Math.max(1, Math.floor(merged.length / 5)) === 0 ? d.dateLabel : "",
     }));
-  }, [data, adsData, activeTab, isSocialAvail, isIgAvail, isAdsAvail]);
+  }, [data, adsData, isSocialAvail, isIgAvail, isAdsAvail, allowedPlatforms]);
 
   // Series candidates allowed for this tab & capability
   const candidateSeries = seriesDefs.filter((s) => {
@@ -249,7 +276,7 @@ export default function TrendChart({ data, adsData, capabilities, loading, activ
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
             <XAxis
-              dataKey="dateLabel"
+              dataKey="dateKey"
               axisLine={false}
               tickLine={false}
               tick={{ fontSize: 11, fill: "#94A3B8" }}

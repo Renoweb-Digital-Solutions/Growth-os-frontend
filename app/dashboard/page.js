@@ -5,6 +5,9 @@
 // How: Renders the Header (greeting + filters) and all dashboard widgets in a
 //      CSS Grid layout (12-column on desktop).
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
 // Component imports from frontend/components/dashboard/
 import Header from "@/components/dashboard/Header";
 import ForecastChart from "@/components/dashboard/ForecastChart";
@@ -20,8 +23,28 @@ import { useMetaCampaigns } from "@/hooks/useMetaInsights";
 import { useMetaAssetSelection } from "@/hooks/useMetaAssetSelection";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { selectedAssets } = useMetaAssetSelection();
   const { campaigns, meta, capabilities, loading, error } = useMetaCampaigns(selectedAssets);
+
+  // Forward any OAuth callback redirected to /dashboard directly to Settings > Integrations
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const isOAuthCallback =
+      searchParams.has("meta_status") ||
+      searchParams.has("google_status") ||
+      searchParams.has("google_error") ||
+      searchParams.has("linkedin_status") ||
+      searchParams.has("x_status");
+
+    if (isOAuthCallback) {
+      if (!searchParams.has("tab")) {
+        searchParams.set("tab", "integrations");
+      }
+      router.replace(`/dashboard/settings?${searchParams.toString()}`);
+    }
+  }, [router]);
 
   return (
     <>

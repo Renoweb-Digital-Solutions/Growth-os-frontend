@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
+import { parseAdsConversionActions } from "@/lib/analyticsInsights";
 
 const columnDefs = [
   { key: "name", label: "Ad Set Name", sortable: true },
@@ -12,7 +13,7 @@ const columnDefs = [
   { key: "ctr", label: "CTR", sortable: true },
   { key: "cpc", label: "CPC", sortable: true },
   { key: "cpm", label: "CPM", sortable: true },
-  { key: "conversions", label: "Leads", sortable: true },
+  { key: "conversions", label: "Conversions", sortable: true },
 ];
 
 export default function AdSetTable({ data, meta, capabilities, loading, error, onSelectAdSet }) {
@@ -31,13 +32,7 @@ export default function AdSetTable({ data, meta, capabilities, loading, error, o
   const isUnavailable = capabilities?.ads?.available === false;
 
   const mappedData = (data || []).map((item) => {
-    let leads = 0;
-    if (Array.isArray(item.actions)) {
-      const leadAction = item.actions.find(a => a.action_type === "lead");
-      if (leadAction && Number.isFinite(parseFloat(leadAction.value))) {
-        leads = parseFloat(leadAction.value);
-      }
-    }
+    const conversionData = parseAdsConversionActions(item.actions);
 
     const normalizeNumber = (value) => {
       if (value === null || value === undefined || value === "") return null;
@@ -55,7 +50,8 @@ export default function AdSetTable({ data, meta, capabilities, loading, error, o
       ctr: normalizeNumber(item.ctr),
       cpc: normalizeNumber(item.cpc),
       cpm: normalizeNumber(item.cpm),
-      conversions: leads === 0 && !item.actions ? null : leads,
+      conversions: conversionData.value !== null ? conversionData.value : null,
+      conversionType: conversionData.typeLabel,
       raw: item,
     };
   });
@@ -166,7 +162,18 @@ export default function AdSetTable({ data, meta, capabilities, loading, error, o
                   <td className="py-3 pr-4 text-[13px] text-slate-600">{formatPercent(item.ctr)}</td>
                   <td className="py-3 pr-4 text-[13px] text-slate-600">{formatCurrency(item.cpc)}</td>
                   <td className="py-3 pr-4 text-[13px] text-slate-600">{formatCurrency(item.cpm)}</td>
-                  <td className="py-3 pr-4 text-[13px] font-semibold text-indigo-600">{formatNumber(item.conversions)}</td>
+                  <td className="py-3 pr-4 text-[13px] font-semibold text-indigo-600">
+                    {item.conversions !== null ? (
+                      <span>
+                        {formatNumber(item.conversions)}
+                        {item.conversionType && item.conversionType !== "Conversions" && (
+                          <span className="text-[10.5px] text-slate-400 font-normal ml-1">({item.conversionType})</span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 font-normal">Unavailable</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
