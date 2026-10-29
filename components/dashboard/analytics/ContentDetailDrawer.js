@@ -1,15 +1,57 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { getMetaContentDetail } from "@/lib/metaApi";
-import { X, ExternalLink, ThumbsUp, MessageSquare, Share2, Eye, Heart, Activity, AlertTriangle } from "lucide-react";
+import { getMetaContentDetail, connectMeta } from "@/lib/metaApi";
+import { X, ExternalLink, ThumbsUp, MessageSquare, Share2, Eye, Heart, Activity, AlertTriangle, Users } from "lucide-react";
+
+const isPermissionError = (msg) => {
+  if (!msg || typeof msg !== "string") return false;
+  const lower = msg.toLowerCase();
+  return (
+    lower.includes("permission") ||
+    lower.includes("reconnect") ||
+    lower.includes("re-authorize") ||
+    lower.includes("reauthorize") ||
+    lower.includes("unauthorized") ||
+    lower.includes("access token") ||
+    lower.includes("oauth") ||
+    lower.includes("expired")
+  );
+};
+
+const sanitizeErrorMessage = (msg) => {
+  if (!msg || typeof msg !== "string") return "An error occurred while loading content details.";
+  return msg
+    .replace(/(?:access_token|token|secret|client_secret|bearer)=?[^\s&]+/gi, "[REDACTED]")
+    .replace(/EA[A-Za-z0-9]{20,}/g, "[REDACTED_TOKEN]");
+};
 
 export default function ContentDetailDrawer({ item, onClose }) {
-  const [detailData, setDetailData] = useState(item);
+  const [detailData, setDetailData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
   const abortControllerRef = useRef(null);
+
+  const handleRetry = () => {
+    setRetryCount((c) => c + 1);
+  };
+
+  const handleReconnect = async () => {
+    try {
+      setIsReconnecting(true);
+      const res = await connectMeta();
+      if (res?.url) {
+        window.location.href = res.url;
+      }
+    } catch (err) {
+      console.error("Meta reconnection error:", err);
+    } finally {
+      setIsReconnecting(false);
+    }
+  };
 
   useEffect(() => {
     if (!item?.contentId) return;
@@ -57,11 +99,16 @@ export default function ContentDetailDrawer({ item, onClose }) {
         abortControllerRef.current.abort();
       }
     };
-  }, [item?.contentId]);
+  }, [item?.contentId, retryCount]);
 
   if (!item) return null;
 
-  const current = detailData || item;
+  const isMatchingDetail = detailData && (
+    String(detailData.contentId) === String(item?.contentId) ||
+    String(detailData.postId) === String(item?.contentId) ||
+    String(detailData.mediaId) === String(item?.contentId)
+  );
+  const current = isMatchingDetail ? detailData : item;
 
   // Strict null semantics: Never convert null to 0
   const formatSafeNumber = (val) => {
@@ -87,44 +134,115 @@ export default function ContentDetailDrawer({ item, onClose }) {
   const thumbnail = current.fullPicture || current.mediaUrl;
   const metrics = current.metrics || {};
 
-  const metricItems = [
-    {
-      label: "Total Engagement",
-      value: formatSafeNumber(metrics.igMediaInteractions ?? metrics.fbPostInteractions),
-      icon: Activity,
-      color: "text-indigo-600 bg-indigo-50",
-    },
-    {
-      label: isFb ? "Reactions" : "Likes",
-      value: formatSafeNumber(isFb ? metrics.reactionCount : metrics.likeCount),
-      icon: isFb ? ThumbsUp : Heart,
-      color: isFb ? "text-blue-600 bg-blue-50" : "text-pink-600 bg-pink-50",
-    },
-    {
-      label: "Comments",
-      value: formatSafeNumber(metrics.commentCount),
-      icon: MessageSquare,
-      color: "text-amber-600 bg-amber-50",
-    },
-    {
-      label: "Shares",
-      value: formatSafeNumber(metrics.shareCount),
-      icon: Share2,
-      color: "text-emerald-600 bg-emerald-50",
-    },
-    {
-      label: "Reach",
-      value: formatSafeNumber(metrics.reach),
-      icon: Eye,
-      color: "text-purple-600 bg-purple-50",
-    },
-    {
-      label: "Impressions",
-      value: formatSafeNumber(metrics.impressions),
-      icon: Eye,
-      color: "text-slate-600 bg-slate-100",
-    },
-  ];
+  const uniqueMediaViewersVal = metrics.uniqueMediaViewers ?? current.uniqueMediaViewers;
+  const viewsVal = metrics.views ?? current.views ?? metrics.postMediaViews ?? current.postMediaViews;
+  const reactionsVal = metrics.reactionCount ?? current.reactions ?? current.reactionCount ?? metrics.likeCount;
+  const commentsVal = metrics.commentCount ?? current.comments ?? current.commentCount;
+  const sharesVal = metrics.shareCount ?? current.shares ?? current.shareCount;
+  const interactionsVal = metrics.fbPostInteractions ?? current.interactions ?? current.fbPostInteractions;
+  const engagedUsersVal = metrics.engagement ?? current.engagement;
+  const reachVal = metrics.reach ?? current.reach;
+  const impressionsVal = metrics.impressions ?? current.impressions;
+
+  const metricItems = isFb
+    ? [
+        {
+          label: "Lifetime Views",
+          value: formatSafeNumber(viewsVal),
+          icon: Eye,
+          color: "text-blue-600 bg-blue-50",
+        },
+        {
+          label: "Unique Media Viewers",
+          value: formatSafeNumber(uniqueMediaViewersVal),
+          icon: Eye,
+          color: "text-purple-600 bg-purple-50",
+        },
+        {
+          label: "Interactions",
+          value: formatSafeNumber(interactionsVal),
+          icon: Activity,
+          color: "text-indigo-600 bg-indigo-50",
+        },
+        {
+          label: "Reactions",
+          value: formatSafeNumber(reactionsVal),
+          icon: ThumbsUp,
+          color: "text-blue-600 bg-blue-50",
+        },
+        {
+          label: "Comments",
+          value: formatSafeNumber(commentsVal),
+          icon: MessageSquare,
+          color: "text-amber-600 bg-amber-50",
+        },
+        {
+          label: "Shares",
+          value: formatSafeNumber(sharesVal),
+          icon: Share2,
+          color: "text-emerald-600 bg-emerald-50",
+        },
+        {
+          label: "Engaged Users",
+          value: formatSafeNumber(engagedUsersVal),
+          icon: Users,
+          color: "text-blue-600 bg-blue-50",
+        },
+        ...(reachVal !== null && reachVal !== undefined && reachVal !== uniqueMediaViewersVal
+          ? [
+              {
+                label: "Reach",
+                value: formatSafeNumber(reachVal),
+                icon: Eye,
+                color: "text-indigo-600 bg-indigo-50",
+              },
+            ]
+          : []),
+        {
+          label: "Impressions",
+          value: formatSafeNumber(impressionsVal),
+          icon: Eye,
+          color: "text-slate-600 bg-slate-100",
+        },
+      ]
+    : [
+        {
+          label: "Total Engagement",
+          value: formatSafeNumber(metrics.igMediaInteractions ?? metrics.engagement),
+          icon: Activity,
+          color: "text-indigo-600 bg-indigo-50",
+        },
+        {
+          label: "Likes",
+          value: formatSafeNumber(metrics.likeCount),
+          icon: Heart,
+          color: "text-pink-600 bg-pink-50",
+        },
+        {
+          label: "Comments",
+          value: formatSafeNumber(metrics.commentCount),
+          icon: MessageSquare,
+          color: "text-amber-600 bg-amber-50",
+        },
+        {
+          label: "Shares",
+          value: formatSafeNumber(metrics.shareCount),
+          icon: Share2,
+          color: "text-emerald-600 bg-emerald-50",
+        },
+        {
+          label: "Reach",
+          value: formatSafeNumber(metrics.reach),
+          icon: Eye,
+          color: "text-purple-600 bg-purple-50",
+        },
+        {
+          label: "Impressions",
+          value: formatSafeNumber(metrics.impressions),
+          icon: Eye,
+          color: "text-slate-600 bg-slate-100",
+        },
+      ];
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -170,11 +288,45 @@ export default function ContentDetailDrawer({ item, onClose }) {
 
             {/* Display error if detail request fails instead of silently swallowing */}
             {error && (
-              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-[12.5px] text-amber-800 flex items-start gap-2.5">
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-[12.5px] text-amber-800 flex items-start justify-between gap-2.5">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-amber-900">
+                      {isPermissionError(error) ? "Facebook Permission Required" : "Unable to load latest content details"}
+                    </p>
+                    <p className="mt-0.5 text-amber-700 text-[11.5px]">{sanitizeErrorMessage(error)}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {isPermissionError(error) ? (
+                    <button
+                      onClick={handleReconnect}
+                      disabled={isReconnecting}
+                      className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {isReconnecting ? "Connecting..." : "Reconnect"}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleRetry}
+                      disabled={loading}
+                      className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-semibold rounded-lg transition-colors flex-shrink-0 disabled:opacity-50"
+                    >
+                      Retry
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Display post-level insightsError notice if present on item */}
+            {current.insightsError && !error && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[12px] text-amber-800 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-amber-900">Unable to load latest content details</p>
-                  <p className="mt-0.5 text-amber-700 text-[11.5px]">{error}</p>
+                  <p className="font-semibold text-amber-900">Post Insights Notice</p>
+                  <p className="text-amber-700 text-[11px] mt-0.5">{sanitizeErrorMessage(current.insightsError)}</p>
                 </div>
               </div>
             )}
@@ -182,6 +334,7 @@ export default function ContentDetailDrawer({ item, onClose }) {
             {/* Thumbnail */}
             {thumbnail && (
               <div className="w-full h-48 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={thumbnail}
                   alt="Post thumbnail"

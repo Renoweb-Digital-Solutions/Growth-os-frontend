@@ -26,6 +26,18 @@ function getCurrentUserId() {
 }
 
 /**
+ * Safely extracts a readable, non-empty error message string from an Error object,
+ * preventing "[object Object]" from ever reaching UI states.
+ */
+function getReadableErrorMessage(err, fallback) {
+  const msg = err?.message;
+  if (typeof msg === "string" && msg.trim() && msg.trim() !== "[object Object]") {
+    return msg.trim();
+  }
+  return fallback;
+}
+
+/**
  * Formats a Date object to YYYY-MM-DD string using local calendar date
  */
 function formatDateString(dateObj) {
@@ -286,7 +298,7 @@ export function useGoogleAnalytics(initialConfig = "28d", activeTab = "overview"
       }
     } catch (err) {
       console.error("Failed to select GA4 property:", err);
-      setPropertiesError(err.message || "Failed to switch property");
+      setPropertiesError(getReadableErrorMessage(err, "Failed to switch property"));
     } finally {
       setIsSwitchingProperty(false);
     }
@@ -350,7 +362,7 @@ export function useGoogleAnalytics(initialConfig = "28d", activeTab = "overview"
         }
       } catch (err) {
         console.error("Failed to initialize GA4 integration:", err);
-        if (isMounted) setStatusError(err.message || "Failed to load Google Analytics status");
+        if (isMounted) setStatusError(getReadableErrorMessage(err, "Failed to load Google Analytics status"));
       } finally {
         if (isMounted) {
           setIsLoadingStatus(false);
@@ -405,7 +417,7 @@ export function useGoogleAnalytics(initialConfig = "28d", activeTab = "overview"
           return { success: true, data: res?.data ?? res, error: null };
         } catch (err) {
           if (err.name === "AbortError") throw err;
-          return { success: false, data: null, error: err.message || "Request failed" };
+          return { success: false, data: null, error: getReadableErrorMessage(err, "Request failed") };
         }
       };
 
@@ -437,7 +449,7 @@ export function useGoogleAnalytics(initialConfig = "28d", activeTab = "overview"
       } catch (err) {
         if (err.name === "AbortError") return;
         console.error("GA4 Insights fetch error:", err);
-        if (isMounted) setAnalyticsError(err.message || "Failed to load Google Analytics data");
+        if (isMounted) setAnalyticsError(getReadableErrorMessage(err, "Failed to load Google Analytics data"));
       } finally {
         if (isMounted) setIsLoadingAnalytics(false);
       }

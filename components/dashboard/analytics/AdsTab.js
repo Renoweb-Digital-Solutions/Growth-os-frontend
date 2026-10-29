@@ -6,6 +6,7 @@ import CampaignTable from "@/components/dashboard/analytics/CampaignTable";
 import AdSetTable from "@/components/dashboard/analytics/AdSetTable";
 import AdTable from "@/components/dashboard/analytics/AdTable";
 import TrendChart from "@/components/dashboard/analytics/TrendChart";
+import { parseAdsConversionActions } from "@/lib/analyticsInsights";
 import { Megaphone, ChevronRight, DollarSign, Eye, MousePointer, Target, TrendingUp, Layers, Tag } from "lucide-react";
 
 export default function AdsTab({
@@ -54,13 +55,9 @@ export default function AdsTab({
   const cpc = adsInsight.cpc;
   const cpm = adsInsight.cpm;
 
-  let leads = "Unavailable";
-  if (Array.isArray(adsInsight.actions)) {
-    const leadAction = adsInsight.actions.find((a) => a.action_type === "lead");
-    if (leadAction && Number.isFinite(parseFloat(leadAction.value))) {
-      leads = parseFloat(leadAction.value);
-    }
-  }
+  const conversionData = parseAdsConversionActions(adsInsight.actions);
+  const conversionValue = conversionData.value !== null ? conversionData.value : null;
+  const conversionLabel = conversionData.typeLabel || "Conversions";
 
   // Breadcrumb navigation handler
   const resetToLevel = (level) => {
@@ -166,8 +163,8 @@ export default function AdsTab({
               <p className="text-lg font-bold text-slate-800 mt-1">{formatSafeCurrency(cpc)}</p>
             </div>
             <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs col-span-2 sm:col-span-1">
-              <p className="text-[10.5px] font-semibold uppercase text-slate-400">Leads</p>
-              <p className="text-lg font-bold text-indigo-600 mt-1">{formatSafeNumber(leads)}</p>
+              <p className="text-[10.5px] font-semibold uppercase text-slate-400">{conversionLabel}</p>
+              <p className="text-lg font-bold text-indigo-600 mt-1">{formatSafeNumber(conversionValue)}</p>
             </div>
           </div>
 

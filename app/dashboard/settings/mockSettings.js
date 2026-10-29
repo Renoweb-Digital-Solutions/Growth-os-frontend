@@ -22,6 +22,7 @@ export const integrations = [
   { id: "int_gsc", name: "Google Search Console", description: "Monitor organic search performance, queries, and landing pages.", status: "Connect", iconColor: "bg-emerald-600" },
   { id: "int2", name: "Meta Business Suite", description: "Import Facebook and Instagram ad metrics.", status: "Connect", iconColor: "bg-blue-600" },
   { id: "int3", name: "LinkedIn Ads", description: "Track B2B campaign performance.", status: "Connect", iconColor: "bg-blue-700" },
+  { id: "int_x", name: "X (Twitter) Analytics", description: "Track organic impressions, engagements, and tweet performance.", status: "Connect", iconColor: "bg-slate-900" },
   { id: "int4", name: "Slack", description: "Receive notifications and ticket updates.", status: "Connected", iconColor: "bg-purple-600" },
   { id: "int5", name: "Zapier", description: "Automate workflows across 3000+ apps.", status: "Connect", iconColor: "bg-orange-500" },
 ];
