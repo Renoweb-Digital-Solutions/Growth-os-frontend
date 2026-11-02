@@ -599,7 +599,7 @@ test("Four grouped KPI cards contain exactly their designated metrics with corre
     {
       id: "engagement",
       title: "Engagement & Content",
-      expectedKeys: ["interactions", "post_engagements", "reactions", "comments", "shares"],
+      expectedKeys: ["post_engagements", "reactions", "comments", "shares"],
     },
     {
       id: "audience",
@@ -626,7 +626,7 @@ test("Four grouped KPI cards contain exactly their designated metrics with corre
 
   // Group 2: Engagement & Content
   const eng = cardGroupConfig.find((c) => c.id === "engagement");
-  assert.deepEqual(eng.expectedKeys, ["interactions", "post_engagements", "reactions", "comments", "shares"]);
+  assert.deepEqual(eng.expectedKeys, ["post_engagements", "reactions", "comments", "shares"]);
 
   // Group 3: Audience & Followers
   const aud = cardGroupConfig.find((c) => c.id === "audience");
@@ -643,7 +643,7 @@ test("Four grouped KPI cards contain exactly their designated metrics with corre
 test("Card dropdowns are completely isolated; selection changes update only the targeted card", () => {
   let cardSelections = {
     visibility: "views",
-    engagement: "interactions",
+    engagement: "post_engagements",
     audience: "lifetime_followers",
     trends: "daily_views",
   };
@@ -657,28 +657,28 @@ test("Card dropdowns are completely isolated; selection changes update only the 
 
   // Initial state check
   assert.equal(cardSelections.visibility, "views");
-  assert.equal(cardSelections.engagement, "interactions");
+  assert.equal(cardSelections.engagement, "post_engagements");
   assert.equal(cardSelections.audience, "lifetime_followers");
   assert.equal(cardSelections.trends, "daily_views");
 
   // Change Card 1 (Visibility) to "visits"
   handleSelectMetric("visibility", "visits");
   assert.equal(cardSelections.visibility, "visits");
-  assert.equal(cardSelections.engagement, "interactions", "Card 2 remains unchanged");
+  assert.equal(cardSelections.engagement, "post_engagements", "Card 2 remains unchanged");
   assert.equal(cardSelections.audience, "lifetime_followers", "Card 3 remains unchanged");
   assert.equal(cardSelections.trends, "daily_views", "Card 4 remains unchanged");
 
   // Change Card 3 (Audience) to "follows"
   handleSelectMetric("audience", "follows");
   assert.equal(cardSelections.visibility, "visits", "Card 1 remains unchanged");
-  assert.equal(cardSelections.engagement, "interactions", "Card 2 remains unchanged");
+  assert.equal(cardSelections.engagement, "post_engagements", "Card 2 remains unchanged");
   assert.equal(cardSelections.audience, "follows");
   assert.equal(cardSelections.trends, "daily_views", "Card 4 remains unchanged");
 
   // Change Card 4 (Trends) to "daily_follows"
   handleSelectMetric("trends", "daily_follows");
   assert.equal(cardSelections.visibility, "visits");
-  assert.equal(cardSelections.engagement, "interactions");
+  assert.equal(cardSelections.engagement, "post_engagements");
   assert.equal(cardSelections.audience, "follows");
   assert.equal(cardSelections.trends, "daily_follows");
 });

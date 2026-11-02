@@ -876,4 +876,85 @@ test("Post table client-side pagination slices posts with default 10 and load mo
   assert.equal(visiblePosts[24].contentId, "post_25");
 });
 
+// ============================================================================
+// TEST 18: Engagement & Content section excludes Content Interactions
+// ============================================================================
+test("Engagement & Content section excludes Content Interactions and contains exactly 4 metrics", () => {
+  const engagementMetrics = [
+    { key: "post_engagements", label: "Post Engagements" },
+    { key: "reactions", label: "Reactions" },
+    { key: "comments", label: "Comments" },
+    { key: "shares", label: "Shares" },
+  ];
 
+  // Content Interactions is removed
+  assert.equal(engagementMetrics.some((m) => m.key === "interactions"), false);
+  assert.equal(engagementMetrics.some((m) => m.label === "Content Interactions"), false);
+
+  // Exactly 4 metrics remain
+  assert.equal(engagementMetrics.length, 4);
+  assert.deepEqual(
+    engagementMetrics.map((m) => m.key),
+    ["post_engagements", "reactions", "comments", "shares"]
+  );
+});
+
+// ============================================================================
+// TEST 19: Post-wise shares strictly honors shareCount contract and tooltip
+// ============================================================================
+test("Post-wise shares strictly honors shareCount contract, verified zero, and tooltip", () => {
+  const normalizeNumber = (v) => (v !== null && v !== undefined && Number.isFinite(Number(v)) ? Number(v) : null);
+  const formatTableCellNumber = (val) => {
+    if (val === null || val === undefined) return "—";
+    const parsed = Number(val);
+    if (!Number.isFinite(parsed)) return "—";
+    return parsed.toLocaleString();
+  };
+
+  const getShareTooltip = (shares) => {
+    return shares !== null && shares !== undefined
+      ? `${shares.toLocaleString()} shares`
+      : "Share count unavailable from Meta API";
+  };
+
+  // Case 1: Post with explicit shareCount: 5
+  const post1 = {
+    shareCount: 5,
+    shares: { total: null, status: "UNAVAILABLE" },
+  };
+  const normalized1 = normalizeNumber(post1.shareCount ?? post1.metrics?.shareCount ?? post1.shares?.total ?? (typeof post1.shares === "number" ? post1.shares : post1.shares?.count));
+  assert.equal(normalized1, 5);
+  assert.equal(formatTableCellNumber(normalized1), "5");
+  assert.equal(getShareTooltip(normalized1), "5 shares");
+
+  // Case 2: Post with verified 0 shares
+  const post2 = {
+    shareCount: 0,
+    shares: { total: 0, status: "AVAILABLE" },
+  };
+  const normalized2 = normalizeNumber(post2.shareCount ?? post2.metrics?.shareCount ?? post2.shares?.total ?? (typeof post2.shares === "number" ? post2.shares : post2.shares?.count));
+  assert.equal(normalized2, 0);
+  assert.equal(formatTableCellNumber(normalized2), "0", "Verified 0 shares must render as '0', never '—' or 'Unavailable'");
+  assert.equal(getShareTooltip(normalized2), "0 shares");
+
+  // Case 3: Post with unavailable/null shares
+  const post3 = {
+    shareCount: null,
+    shares: { total: null, status: "UNAVAILABLE" },
+  };
+  const normalized3 = normalizeNumber(post3.shareCount ?? post3.metrics?.shareCount ?? post3.shares?.total ?? (typeof post3.shares === "number" ? post3.shares : post3.shares?.count));
+  assert.equal(normalized3, null);
+  assert.equal(formatTableCellNumber(normalized3), "—", "Null shares must render as '—'");
+  assert.equal(getShareTooltip(normalized3), "Share count unavailable from Meta API");
+
+  // Case 4: Post with missing shareCount property entirely
+  const post4 = {
+    id: "post_4",
+    reactions: 10,
+    comments: 2,
+  };
+  const normalized4 = normalizeNumber(post4.shareCount ?? post4.metrics?.shareCount ?? post4.shares?.total ?? (typeof post4.shares === "number" ? post4.shares : post4.shares?.count));
+  assert.equal(normalized4, null);
+  assert.equal(formatTableCellNumber(normalized4), "—");
+  assert.equal(getShareTooltip(normalized4), "Share count unavailable from Meta API");
+});

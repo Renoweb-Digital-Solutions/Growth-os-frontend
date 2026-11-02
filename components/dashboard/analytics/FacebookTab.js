@@ -210,7 +210,7 @@ export default function FacebookTab({
   // Independent selection per card
   const [cardSelections, setCardSelections] = useState({
     visibility: "views",
-    engagement: "interactions",
+    engagement: "post_engagements",
     audience: "lifetime_followers",
     trends: "daily_views",
   });
@@ -553,7 +553,7 @@ export default function FacebookTab({
         permalinkUrl,
         reactions: normalizeNumber(item.reactions?.total ?? item.reactions ?? item.reactionCount ?? item.metrics?.reactionCount ?? item.metrics?.likeCount),
         comments: normalizeNumber(item.comments?.total ?? item.comments ?? item.commentCount ?? item.metrics?.commentCount),
-        shares: normalizeNumber(item.shares?.total ?? item.shares ?? item.shareCount ?? item.metrics?.shareCount),
+        shares: normalizeNumber(item.shareCount ?? item.metrics?.shareCount ?? item.shares?.total ?? (typeof item.shares === "number" ? item.shares : item.shares?.count)),
         uniqueMediaViewers: normalizeNumber(item.uniqueMediaViewers ?? item.metrics?.uniqueMediaViewers),
         reach: normalizeNumber(item.reach ?? item.metrics?.reach),
         views,
@@ -1026,24 +1026,6 @@ export default function FacebookTab({
 
     // 2. Engagement & Content
     const engagementMetrics = [
-      {
-        key: "interactions",
-        label: "Content Interactions",
-        category: "Engagement & Content",
-        value: formatValue(resolvedContentInteractions),
-        delta: resolvedContentInteractions.delta,
-        icon: ThumbsUp,
-        color: "text-purple-600 bg-purple-50 border-purple-200",
-        accentHex: "#8B5CF6",
-        supported: resolvedContentInteractions.status !== "UNAVAILABLE",
-        hasSeries: resolvedContentInteractions.series.length > 0,
-        series: resolvedContentInteractions.series,
-        summary: resolvedContentInteractions,
-        definition: "Total number of interactions (reactions, comments, and shares) across your published posts during the selected reporting period.",
-        apiMetric: "fbPostInteractions (content aggregate)",
-        unavailabilityReason: resolvedContentInteractions.reason || "Content interactions requires verified post interactions. Post engagements is available separately under Post Engagements.",
-        unit: " interactions",
-      },
       {
         key: "post_engagements",
         label: "Post Engagements",
@@ -2441,13 +2423,13 @@ export default function FacebookTab({
                           title={
                             post.shares !== null && post.shares !== undefined
                               ? `${post.shares.toLocaleString()} shares`
-                              : "Shares unavailable / not returned by Meta for this post"
+                              : "Share count unavailable from Meta API"
                           }
                         >
                           {post.shares !== null && post.shares !== undefined ? (
                             post.shares.toLocaleString()
                           ) : (
-                            <span className="text-slate-400 font-normal" title="Shares unavailable / not returned by Meta for this post">—</span>
+                            <span className="text-slate-400 font-normal" title="Share count unavailable from Meta API">—</span>
                           )}
                         </td>
                         <td
