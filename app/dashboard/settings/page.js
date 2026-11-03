@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import PageHeader from "@/components/dashboard/PageHeader";
 import SettingsTabs from "@/components/dashboard/settings/SettingsTabs";
@@ -22,7 +22,15 @@ function SettingsContent() {
   const tabParam = searchParams.get("tab");
   const [selectedTab, setSelectedTab] = useState(null);
 
-  const activeTab = selectedTab || (tabParam && validTabs.includes(tabParam) ? tabParam : "profile");
+  const isOAuthCallback =
+    searchParams.has("meta_status") ||
+    searchParams.has("google_status") ||
+    searchParams.has("google_error") ||
+    searchParams.has("linkedin_status") ||
+    searchParams.has("x_status");
+
+  const defaultTab = isOAuthCallback ? "integrations" : "profile";
+  const activeTab = selectedTab || (tabParam && validTabs.includes(tabParam) ? tabParam : defaultTab);
 
   const handleTabChange = (tabId) => {
     setSelectedTab(tabId);
@@ -67,4 +75,3 @@ export default function SettingsPage() {
     </Suspense>
   );
 }
-

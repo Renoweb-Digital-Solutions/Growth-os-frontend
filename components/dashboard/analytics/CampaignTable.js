@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronUp, ChevronDown, ChevronRight, Megaphone } from "lucide-react";
+import { parseAdsConversionActions } from "@/lib/analyticsInsights";
 
 const columnDefs = [
   { key: "name", label: "Campaign Name", sortable: true },
@@ -11,7 +12,7 @@ const columnDefs = [
   { key: "impressions", label: "Impressions", sortable: true },
   { key: "clicks", label: "Clicks", sortable: true },
   { key: "ctr", label: "CTR", sortable: true },
-  { key: "conversions", label: "Leads", sortable: true },
+  { key: "conversions", label: "Conversions", sortable: true },
 ];
 
 export default function CampaignTable({ campaigns = [], capabilities, loading, error, onSelectCampaign }) {
@@ -31,13 +32,7 @@ export default function CampaignTable({ campaigns = [], capabilities, loading, e
   const isUnavailable = capabilities?.ads?.available === false;
 
   const mappedData = (campaigns || []).map((c) => {
-    let leads = 0;
-    if (Array.isArray(c.actions)) {
-      const leadAction = c.actions.find((a) => a.action_type === "lead");
-      if (leadAction && Number.isFinite(parseFloat(leadAction.value))) {
-        leads = parseFloat(leadAction.value);
-      }
-    }
+    const conversionData = parseAdsConversionActions(c.actions);
 
     const normalizeNumber = (value) => {
       if (value === null || value === undefined || value === "") return null;
@@ -54,7 +49,8 @@ export default function CampaignTable({ campaigns = [], capabilities, loading, e
       impressions: normalizeNumber(c.impressions),
       clicks: normalizeNumber(c.clicks),
       ctr: normalizeNumber(c.ctr),
-      conversions: leads === 0 && !c.actions ? null : leads,
+      conversions: conversionData.value !== null ? conversionData.value : null,
+      conversionType: conversionData.typeLabel,
       raw: c,
     };
   });
@@ -148,8 +144,18 @@ export default function CampaignTable({ campaigns = [], capabilities, loading, e
                   <td className="py-3.5 pr-4 text-[13px] font-semibold text-slate-800">{formatCurrency(item.spend)}</td>
                   <td className="py-3.5 pr-4 text-[13px] text-slate-600">{formatNumber(item.impressions)}</td>
                   <td className="py-3.5 pr-4 text-[13px] text-slate-600">{formatNumber(item.clicks)}</td>
-                  <td className="py-3.5 pr-4 text-[13px] text-slate-600">{formatPercent(item.ctr)}</td>
-                  <td className="py-3.5 pr-4 text-[13px] font-semibold text-indigo-600">{formatNumber(item.conversions)}</td>
+                  <td className="py-3.5 pr-4 text-[13px] font-semibold text-indigo-600">
+                    {item.conversions !== null ? (
+                      <span>
+                        {formatNumber(item.conversions)}
+                        {item.conversionType && item.conversionType !== "Conversions" && (
+                          <span className="text-[10.5px] text-slate-400 font-normal ml-1">({item.conversionType})</span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 font-normal">Unavailable</span>
+                    )}
+                  </td>
                   <td className="py-3.5 text-right">
                     <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-indigo-600 group-hover:translate-x-1 transition-transform">
                       <span>View Ad Sets</span>

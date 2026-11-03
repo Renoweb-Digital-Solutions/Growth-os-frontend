@@ -10,6 +10,13 @@ const metaTimeRanges = [
   { label: "90D", days: 90 },
 ];
 
+// Facebook (Meta Business Suite standard) analytics presets
+const fbTimeRanges = [
+  { label: "7D", key: "7d", days: 7 },
+  { label: "28D", key: "28d", days: 28 },
+  { label: "90D", key: "90d", days: 90 },
+];
+
 // Google Search Console main header presets
 const gscMainRanges = [
   { label: "24 hours", key: "24h" },
@@ -123,6 +130,7 @@ export function AnalyticsDateSelector({
 
   const isGscTab = activeTab === "gsc";
   const isGa4Tab = activeTab === "ga4";
+  const isFbTab = activeTab === "facebook";
 
   // Synchronize internal inputs when selectedRange prop changes externally
   const [prevSelectedRange, setPrevSelectedRange] = useState(selectedRange);
@@ -494,23 +502,95 @@ export function AnalyticsDateSelector({
                 )}
               </div>
             </>
+          ) : isFbTab ? (
+            /* Facebook (Meta Business Suite) Range Selector */
+            <>
+              {fbTimeRanges.map((range) => {
+                const isActive = !isCustomActive && (
+                  selectedRange === range.key ||
+                  selectedRange === range.days ||
+                  (range.days === 28 && (selectedRange === "28d" || selectedRange === 28 || selectedRange === 30 || selectedRange === "30d" || !selectedRange)) ||
+                  (range.days === 7 && (selectedRange === 7 || selectedRange === "7d" || selectedRange === "7D")) ||
+                  (range.days === 90 && (selectedRange === 90 || selectedRange === "90d" || selectedRange === "90D" || selectedRange === "3m" || selectedRange === "3M"))
+                );
+                return (
+                  <button
+                    key={range.key}
+                    type="button"
+                    onClick={() => handleSelectPreset(range.key)}
+                    className={`px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-all cursor-pointer ${
+                      isActive
+                        ? "bg-indigo-600 text-white shadow-xs"
+                        : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {range.label}
+                  </button>
+                );
+              })}
+
+              {/* Facebook Custom Range Trigger Button */}
+              <button
+                type="button"
+                onClick={handleTogglePicker}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-all cursor-pointer ${
+                  isCustomActive
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : isPickerOpen
+                    ? "bg-slate-100 text-slate-800"
+                    : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                }`}
+                title="Select custom date range"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>{isCustomActive && activeRangeText ? activeRangeText : "Custom"}</span>
+              </button>
+
+              {/* Exact Selected Date Range Display for Facebook */}
+              <div className="hidden md:flex items-center gap-1.5 ml-2 pl-2.5 border-l border-slate-200 text-[11.5px] font-medium text-slate-500 select-none">
+                <span className="text-slate-400">Range:</span>
+                <span className="font-semibold text-slate-700">
+                  {isCustomActive && activeRangeText
+                    ? activeRangeText
+                    : (() => {
+                        const days =
+                          selectedRange === "7d" || selectedRange === 7
+                            ? 7
+                            : selectedRange === "90d" || selectedRange === 90 || selectedRange === "3m"
+                            ? 90
+                            : 28;
+                        const end = new Date();
+                        const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+                        return `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+                      })()}
+                </span>
+              </div>
+            </>
           ) : (
             /* Meta Analytics Standard Selector */
             <>
-              {metaTimeRanges.map((range) => (
-                <button
-                  key={range.days}
-                  type="button"
-                  onClick={() => handleSelectPreset(range.days)}
-                  className={`px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-all cursor-pointer ${
-                    selectedRange === range.days || (range.days === 30 && (selectedRange === "28d" || selectedRange === 28 || selectedRange === 30 || !selectedRange))
-                      ? "bg-indigo-600 text-white shadow-xs"
-                      : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  {range.label}
-                </button>
-              ))}
+              {metaTimeRanges.map((range) => {
+                const isActive = !isCustomActive && (
+                  selectedRange === range.days ||
+                  (range.days === 30 && (selectedRange === 30 || selectedRange === "30d" || selectedRange === "30D" || selectedRange === "28d" || selectedRange === 28 || !selectedRange)) ||
+                  (range.days === 7 && (selectedRange === 7 || selectedRange === "7d" || selectedRange === "7D")) ||
+                  (range.days === 90 && (selectedRange === 90 || selectedRange === "90d" || selectedRange === "90D" || selectedRange === "3m" || selectedRange === "3M"))
+                );
+                return (
+                  <button
+                    key={range.days}
+                    type="button"
+                    onClick={() => handleSelectPreset(range.days)}
+                    className={`px-3 py-1.5 text-[12px] font-semibold rounded-lg transition-all cursor-pointer ${
+                      isActive
+                        ? "bg-indigo-600 text-white shadow-xs"
+                        : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {range.label}
+                  </button>
+                );
+              })}
 
               {/* Meta Custom Range Trigger Button */}
               <button

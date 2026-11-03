@@ -18,9 +18,15 @@ export default function OverviewTab({
   prevSocial,
   prevAds,
   capabilities,
+  dateRange,
   loading,
   onSwitchTab,
 }) {
+  const activeSince = dateRange?.since || overview?.meta?.dateRange?.since || social?.meta?.dateRange?.since || null;
+  const activeUntil = dateRange?.until || overview?.meta?.dateRange?.until || social?.meta?.dateRange?.until || null;
+  const prevSince = dateRange?.prevSince || null;
+  const prevUntil = dateRange?.prevUntil || null;
+
   const formatSafeNumber = (val) => {
     if (val === null || val === undefined || val === "") return "Unavailable";
     const parsed = Number(val);
@@ -45,16 +51,45 @@ export default function OverviewTab({
     return { absolute, percentage, trendAvailable: true };
   };
 
-  const sumInsightValues = (insightArray, metricName) => {
-    if (!insightArray) return null;
+  const sumInsightValues = (insightArray, metricName, since, until) => {
+    if (!insightArray || !Array.isArray(insightArray)) return undefined;
     const insight = insightArray.find((i) => i.name === metricName);
-    if (insight && Array.isArray(insight.values)) {
-      const validValues = insight.values.filter((item) => item.value !== null && item.value !== undefined);
-      if (validValues.length > 0) {
-        return validValues.reduce((sum, item) => sum + Number(item.value), 0);
-      }
+    if (!insight) return undefined;
+    if (!Array.isArray(insight.values)) return undefined;
+    if (insight.values.length === 0) return null;
+
+    let valuesToProcess = insight.values;
+    if (since || until) {
+      valuesToProcess = valuesToProcess.filter((item) => {
+        const rawTime = item.endTime || item.end_time || item.timestamp || item.date;
+        if (!rawTime) return true;
+        try {
+          const itemDate = new Date(rawTime).toISOString().split("T")[0];
+          if (since && itemDate < since) return false;
+          if (until && itemDate > until) return false;
+          return true;
+        } catch (e) {
+          return true;
+        }
+      });
     }
-    return null;
+
+    if (valuesToProcess.length === 0) return null;
+
+    const validValues = valuesToProcess.filter((item) => item.value !== null && item.value !== undefined);
+    if (validValues.length === 0) return null;
+
+    return validValues.reduce((sum, item) => sum + Number(item.value), 0);
+  };
+
+  const resolveMetricDisplay = (val, isAvailable, fallbackText) => {
+    if (!isAvailable) return fallbackText;
+    if (val === undefined) return "Unavailable";
+    if (val === null) return "No data";
+    if (typeof val === "number" || (typeof val === "string" && Number.isFinite(Number(val)))) {
+      return formatSafeNumber(val);
+    }
+    return "Unavailable";
   };
 
   // 1. Total Reach (Meta Ads)
@@ -63,37 +98,47 @@ export default function OverviewTab({
   const adsText = adsAvail ? "Unavailable" : (adsDisabled ? "Not enabled" : "Not Connected");
 
   const rawReach = overview?.data?.adsOverview?.reach;
-  const reachValue = adsAvail && rawReach !== undefined && rawReach !== null ? formatSafeNumber(rawReach) : adsText;
-  const prevRawReach = adsAvail && prevOverview?.data?.adsOverview?.reach !== undefined ? Number(prevOverview.data.adsOverview.reach) : null;
-  const reachTrend = calculateTrend(rawReach !== undefined ? Number(rawReach) : null, prevRawReach);
+  const reachValue = !adsAvail ? adsText : (rawReach === undefined ? "Unavailable" : rawReach === null ? "No data" : formatSafeNumber(rawReach));
+  const prevRawReach = adsAvail && prevOverview?.data?.adsOverview?.reach !== undefined && prevOverview?.data?.adsOverview?.reach !== null ? Number(prevOverview.data.adsOverview.reach) : null;
+  const reachTrend = calculateTrend(rawReach !== undefined && rawReach !== null ? Number(rawReach) : null, prevRawReach);
 
   // 2. FB Page Views
   const socialAvail = capabilities?.social?.available === true;
   const fbText = socialAvail ? "Unavailable" : "Not Connected";
-  const fbPageViews = socialAvail ? sumInsightValues(social?.data?.page?.insights, "page_views_total") : null;
-  const fbViewsValue = socialAvail ? (fbPageViews !== null ? formatSafeNumber(fbPageViews) : fbText) : fbText;
-  const prevFbPageViews = socialAvail ? sumInsightValues(prevSocial?.data?.page?.insights, "page_views_total") : null;
-  const fbViewsTrend = calculateTrend(fbPageViews, prevFbPageViews);
+  const fbPageViews = socialAvail ? sumInsightValues(social?.data?.page?.insights, "page_views_total", activeSince, activeUntil) : null;
+  const fbViewsValue = resolveMetricDisplay(fbPageViews, socialAvail, fbText);
+  const prevFbPageViews = socialAvail ? sumInsightValues(prevSocial?.data?.page?.insights, "page_views_total", prevSince, prevUntil) : null;
+  const fbViewsTrend = calculateTrend(typeof fbPageViews === "number" ? fbPageViews : null, typeof prevFbPageViews === "number" ? prevFbPageViews : null);
 
   // 3. IG Impressions
   const igAvail = capabilities?.instagram?.available === true;
   const igText = igAvail ? "Unavailable" : "Not Connected";
-  const igImpressions = igAvail ? sumInsightValues(social?.data?.instagram?.insights, "impressions") : null;
-  const igImpsValue = igAvail ? (igImpressions !== null ? formatSafeNumber(igImpressions) : igText) : igText;
-  const prevIgImpressions = igAvail ? sumInsightValues(prevSocial?.data?.instagram?.insights, "impressions") : null;
-  const igImpsTrend = calculateTrend(igImpressions, prevIgImpressions);
+  const igImpressions = igAvail ? sumInsightValues(social?.data?.instagram?.insights, "impressions", activeSince, activeUntil) : null;
+  const igImpsValue = resolveMetricDisplay(igImpressions, igAvail, igText);
+  const prevIgImpressions = igAvail ? sumInsightValues(prevSocial?.data?.instagram?.insights, "impressions", prevSince, prevUntil) : null;
+  const igImpsTrend = calculateTrend(typeof igImpressions === "number" ? igImpressions : null, typeof prevIgImpressions === "number" ? prevIgImpressions : null);
 
   // 4. Meta Ads Clicks
   const rawClicks = ads?.data?.insights?.[0]?.clicks ?? overview?.data?.adsOverview?.clicks;
-  const clicksValue = adsAvail && rawClicks !== undefined && rawClicks !== null ? formatSafeNumber(rawClicks) : adsText;
-  const prevRawClicks = adsAvail && prevAds?.data?.insights?.[0]?.clicks !== undefined ? Number(prevAds.data.insights[0].clicks) : null;
-  const clicksTrend = calculateTrend(rawClicks !== undefined ? Number(rawClicks) : null, prevRawClicks);
+  const clicksValue = !adsAvail ? adsText : (rawClicks === undefined ? "Unavailable" : rawClicks === null ? "No data" : formatSafeNumber(rawClicks));
+  const prevRawClicks = adsAvail && prevAds?.data?.insights?.[0]?.clicks !== undefined && prevAds?.data?.insights?.[0]?.clicks !== null
+    ? Number(prevAds.data.insights[0].clicks)
+    : (prevOverview?.data?.adsOverview?.clicks !== undefined && prevOverview?.data?.adsOverview?.clicks !== null ? Number(prevOverview.data.adsOverview.clicks) : null);
+  const clicksTrend = calculateTrend(rawClicks !== undefined && rawClicks !== null ? Number(rawClicks) : null, prevRawClicks);
 
   // 5. Ads Spend
   const rawSpend = overview?.data?.adsOverview?.spend ?? ads?.data?.insights?.[0]?.spend;
-  const spendValue = adsAvail && rawSpend !== undefined && rawSpend !== null ? `$${Number(rawSpend).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : adsText;
-  const prevRawSpend = adsAvail && prevOverview?.data?.adsOverview?.spend !== undefined ? Number(prevOverview.data.adsOverview.spend) : null;
-  const spendTrend = calculateTrend(rawSpend !== undefined ? Number(rawSpend) : null, prevRawSpend);
+  const spendValue = !adsAvail
+    ? adsText
+    : (rawSpend === undefined
+      ? "Unavailable"
+      : rawSpend === null
+      ? "No data"
+      : `$${Number(rawSpend).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  const prevRawSpend = adsAvail && prevOverview?.data?.adsOverview?.spend !== undefined && prevOverview?.data?.adsOverview?.spend !== null
+    ? Number(prevOverview.data.adsOverview.spend)
+    : (prevAds?.data?.insights?.[0]?.spend !== undefined && prevAds?.data?.insights?.[0]?.spend !== null ? Number(prevAds.data.insights[0].spend) : null);
+  const spendTrend = calculateTrend(rawSpend !== undefined && rawSpend !== null ? Number(rawSpend) : null, prevRawSpend);
 
   const kpis = [
     { label: "Meta Ads Reach", value: reachValue, ...reachTrend, sparkline: [], color: "#6366F1" },

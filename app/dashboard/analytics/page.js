@@ -9,14 +9,18 @@ import InstagramTab from "@/components/dashboard/analytics/InstagramTab";
 import AdsTab from "@/components/dashboard/analytics/AdsTab";
 import SearchConsoleTab from "@/components/dashboard/analytics/SearchConsoleTab";
 import GoogleAnalyticsTab from "@/components/dashboard/analytics/ga4/GoogleAnalyticsTab";
+import LinkedInTab from "@/components/dashboard/analytics/LinkedInTab";
+import XTab from "@/components/dashboard/analytics/XTab";
 import { useMetaInsights } from "@/hooks/useMetaInsights";
 import { useMetaAssetSelection } from "@/hooks/useMetaAssetSelection";
 import { useGoogleSearchConsole } from "@/hooks/useGoogleSearchConsole";
 import { useGoogleAnalytics } from "@/hooks/useGoogleAnalytics";
-import { connectMeta } from "@/lib/metaApi";
+import { useLinkedIn } from "@/hooks/useLinkedIn";
+import { useXAnalytics } from "@/hooks/useXAnalytics";
+import { connectMeta, getMetaAssets, normalizeMetaAssets } from "@/lib/metaApi";
 import { exportOverviewData, exportContentData, exportAdsData } from "@/lib/exportUtils";
 
-const VALID_ANALYTICS_TABS = ["overview", "facebook", "instagram", "ads", "gsc", "ga4"];
+const VALID_ANALYTICS_TABS = ["overview", "facebook", "instagram", "ads", "linkedin", "x", "gsc", "ga4"];
 
 const TAB_ALIASES = {
   "google-analytics": "ga4",
@@ -27,6 +31,13 @@ const TAB_ALIASES = {
   "searchconsole": "gsc",
   "fb": "facebook",
   "ig": "instagram",
+  "li": "linkedin",
+  "linkedin-ads": "linkedin",
+  "linkedin_ads": "linkedin",
+  "linkedin-community": "linkedin",
+  "twitter": "x",
+  "x-analytics": "x",
+  "x_analytics": "x",
 };
 
 /**
@@ -107,27 +118,59 @@ export default function AnalyticsPage() {
   }, [activeTab]);
 
   // Consume persisted user asset selections
-  const { selectedAssets } = useMetaAssetSelection();
+  // Discovered Meta assets state
+  const [metaAssets, setMetaAssets] = useState(null);
 
-  // Ensure Meta insights hook receives a numeric day count even when custom range or string preset is active
-  const metaRangeDays = typeof selectedRange === "number"
-    ? selectedRange
-    : selectedRange === "28d" || selectedRange === "28D"
-    ? 28
-    : selectedRange === "7d" || selectedRange === "7D"
-    ? 7
-    : selectedRange === "90d" || selectedRange === "3m" || selectedRange === "3M"
-    ? 90
-    : selectedRange === "24h" || selectedRange === "24H" || selectedRange === "today" || selectedRange === "yesterday"
-    ? 1
-    : selectedRange === "30d" || selectedRange === "30D"
-    ? 30
-    : 28;
+  // Discover accessible Meta assets when on Meta-related tabs
+  useEffect(() => {
+    let isMounted = true;
+    async function loadMetaAssets() {
+      try {
+        const res = await getMetaAssets();
+        if (isMounted && res) {
+          const normalized = normalizeMetaAssets(res);
+          setMetaAssets(normalized);
+        }
+      } catch (e) {
+        // Non-blocking asset discovery error
+      }
+    }
+    const isMetaTab = ["overview", "facebook", "instagram", "ads"].includes(activeTab);
+    if (isMetaTab) {
+      loadMetaAssets();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab]);
+
+  // Consume persisted user asset selections with discovered assets validation
+  const { selectedAssets, selectPage } = useMetaAssetSelection(metaAssets);
+
+  // Derive Meta date range configuration supporting presets and custom ranges
+  const metaDateRangeConfig = typeof selectedRange === "object" && selectedRange !== null && selectedRange.isCustom
+    ? { isCustom: true, startDate: selectedRange.startDate, endDate: selectedRange.endDate }
+    : {
+        isCustom: false,
+        days:
+          typeof selectedRange === "number"
+            ? selectedRange
+            : selectedRange === "7d" || selectedRange === "7D" || selectedRange === 7
+            ? 7
+            : selectedRange === "28d" || selectedRange === "28D" || selectedRange === 28
+            ? 28
+            : selectedRange === "90d" || selectedRange === "90D" || selectedRange === "3m" || selectedRange === "3M" || selectedRange === 90
+            ? 90
+            : selectedRange === "24h" || selectedRange === "24H" || selectedRange === "today" || selectedRange === "yesterday" || selectedRange === 1
+            ? 1
+            : 30, // Default Meta preset aligned to 30D button
+      };
 
   // Demand-driven Meta insights hook receiving activeTab
   const {
     overview,
     social,
+    fbAnalytics,
     fbContent,
     igContent,
     ads,
@@ -138,12 +181,13 @@ export default function AnalyticsPage() {
     prevSocial,
     prevAds,
     capabilities,
+    dateRange,
     datasetErrors,
     loading,
     error,
     errorType,
     retry,
-  } = useMetaInsights(metaRangeDays, activeTab, selectedAssets);
+  } = useMetaInsights(metaDateRangeConfig, activeTab, selectedAssets);
 
   // Google Search Console hook receiving activeTab
   const gsc = useGoogleSearchConsole(selectedRange, activeTab);
@@ -152,6 +196,34 @@ export default function AnalyticsPage() {
   // Google Analytics 4 hook receiving activeTab
   const ga4 = useGoogleAnalytics(selectedRange, activeTab);
   const { setDateRange: setGa4DateRange } = ga4;
+
+  // LinkedIn hook receiving activeTab
+  const linkedIn = useLinkedIn();
+
+  // X (Twitter) hook receiving activeTab
+  const xAnalytics = useXAnalytics({ autoFetch: activeTab === "x" });
+
+  // Handle X OAuth redirect query params (?x_status=success|error)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const xStatus = params.get("x_status");
+        if (xStatus === "success") {
+          setTimeout(() => {
+            handleTabChange("x");
+          }, 0);
+          xAnalytics.refresh();
+          const url = new URL(window.location.href);
+          url.searchParams.delete("x_status");
+          url.searchParams.delete("username");
+          window.history.replaceState(null, "", url.toString());
+        }
+      } catch (e) {
+        console.error("Error processing X OAuth callback params:", e);
+      }
+    }
+  }, [handleTabChange, xAnalytics]);
 
   useEffect(() => {
     setGscDateRange(selectedRange);
@@ -193,7 +265,8 @@ export default function AnalyticsPage() {
       ];
       exportOverviewData(kpiData, exportRangeLabel);
     } else if (activeTab === "facebook") {
-      exportContentData(fbContent?.data || [], "facebook", exportRangeLabel);
+      const fbPosts = fbAnalytics?.data?.posts || fbAnalytics?.data?.content?.posts || fbContent?.data || [];
+      exportContentData(fbPosts, "facebook", exportRangeLabel);
     } else if (activeTab === "instagram") {
       exportContentData(igContent?.data || [], "instagram", exportRangeLabel);
     } else if (activeTab === "ads") {
@@ -209,9 +282,17 @@ export default function AnalyticsPage() {
           retry();
           if (activeTab === "gsc") gsc.refresh();
           if (activeTab === "ga4") ga4.refresh();
+          if (activeTab === "linkedin") linkedIn.refresh();
+          if (activeTab === "x") xAnalytics.refresh();
         }}
         onExport={handleExport}
-        isRefreshing={loading || (activeTab === "gsc" && gsc.isLoadingAnalytics) || (activeTab === "ga4" && ga4.isLoadingAnalytics)}
+        isRefreshing={
+          loading ||
+          (activeTab === "gsc" && gsc.isLoadingAnalytics) ||
+          (activeTab === "ga4" && ga4.isLoadingAnalytics) ||
+          (activeTab === "linkedin" && linkedIn.isLoadingStatus) ||
+          (activeTab === "x" && (xAnalytics.isLoading || xAnalytics.isLoadingStatus))
+        }
       />
 
       {/* Primary Tab Navigation */}
@@ -221,6 +302,8 @@ export default function AnalyticsPage() {
         capabilities={capabilities}
         gscConnected={gsc.isConnected}
         ga4Connected={ga4.isConnected}
+        linkedInConnected={linkedIn.isAnyConnected}
+        xConnected={xAnalytics.isConnected}
       />
 
       {/* Date Range Selector */}
@@ -273,6 +356,7 @@ export default function AnalyticsPage() {
           prevSocial={prevSocial}
           prevAds={prevAds}
           capabilities={capabilities}
+          dateRange={dateRange}
           loading={loading}
           onSwitchTab={handleTabChange}
         />
@@ -280,11 +364,19 @@ export default function AnalyticsPage() {
 
       {activeTab === "facebook" && (
         <FacebookTab
+          fbAnalytics={fbAnalytics}
           social={social}
           fbContent={fbContent}
+          prevSocial={prevSocial}
           capabilities={capabilities}
           loading={loading}
-          error={datasetErrors?.fbContent || datasetErrors?.social}
+          error={datasetErrors?.fbAnalytics || datasetErrors?.fbContent || datasetErrors?.social}
+          dateRange={dateRange}
+          onRetry={retry}
+          onReconnect={handleReconnect}
+          availablePages={metaAssets?.pages || []}
+          selectedPageId={selectedAssets?.pageId}
+          onSelectPage={selectPage}
         />
       )}
 
@@ -311,6 +403,13 @@ export default function AnalyticsPage() {
         />
       )}
 
+      {activeTab === "linkedin" && (
+        <LinkedInTab
+          linkedInState={linkedIn}
+          selectedRange={selectedRange}
+        />
+      )}
+
       {activeTab === "gsc" && (
         <SearchConsoleTab
           isConnected={gsc.isConnected}
@@ -331,6 +430,8 @@ export default function AnalyticsPage() {
           comparisonLabel={gsc.comparisonLabel}
         />
       )}
+
+      {activeTab === "x" && <XTab xState={xAnalytics} />}
 
       {activeTab === "ga4" && <GoogleAnalyticsTab gaState={ga4} />}
     </>

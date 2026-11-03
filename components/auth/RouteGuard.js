@@ -10,7 +10,10 @@ export default function RouteGuard({ children }) {
   const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true);
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+    }, 0);
+
     const authCheck = () => {
       const token = localStorage.getItem("token");
       
@@ -23,13 +26,33 @@ export default function RouteGuard({ children }) {
         router.push("/auth");
       } else if (token && isAuthRoute) {
         setAuthorized(false);
-        router.push("/dashboard");
+        const search = typeof window !== "undefined" ? window.location.search : "";
+        const searchParams = new URLSearchParams(search);
+        const isOAuthCallback =
+          searchParams.has("meta_status") ||
+          searchParams.has("google_status") ||
+          searchParams.has("google_error") ||
+          searchParams.has("linkedin_status") ||
+          searchParams.has("x_status");
+
+        if (isOAuthCallback) {
+          if (!searchParams.has("tab")) {
+            searchParams.set("tab", "integrations");
+          }
+          router.push(`/dashboard/settings?${searchParams.toString()}`);
+        } else {
+          router.push("/dashboard");
+        }
       } else {
         setAuthorized(true);
       }
     };
 
     authCheck();
+
+    return () => {
+      clearTimeout(timer);
+    };
   }, [pathname, router]);
 
   const isProtectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/onboarding');

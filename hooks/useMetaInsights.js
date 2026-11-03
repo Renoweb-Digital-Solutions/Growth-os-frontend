@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   getMetaOverview,
   getMetaSocialInsights,
+  getMetaFacebookAnalytics,
   getMetaContentInsights,
   getMetaAdsInsights,
   getMetaCampaignInsights,
@@ -32,10 +33,11 @@ function formatTimezoneDate(date, timeZone) {
   }
 }
 
-export function useMetaInsights(dateRangeDays, activeTab = "overview", selectedAssets = {}, adsDrillState = {}) {
+export function useMetaInsights(dateRangeInput, activeTab = "overview", selectedAssets = {}, adsDrillState = {}) {
   const [data, setData] = useState({
     overview: null,
     social: null,
+    fbAnalytics: null,
     fbContent: null,
     igContent: null,
     ads: null,
@@ -46,11 +48,13 @@ export function useMetaInsights(dateRangeDays, activeTab = "overview", selectedA
     prevSocial: null,
     prevAds: null,
     capabilities: null,
+    dateRange: null,
   });
 
   const [errors, setErrors] = useState({
     overview: null,
     social: null,
+    fbAnalytics: null,
     fbContent: null,
     igContent: null,
     ads: null,
@@ -59,7 +63,10 @@ export function useMetaInsights(dateRangeDays, activeTab = "overview", selectedA
     adsLevel: null,
   });
 
-  const [loading, setLoading] = useState(true);
+  const META_TABS = ["overview", "facebook", "instagram", "ads"];
+  const isMetaTab = META_TABS.includes(activeTab);
+
+  const [loading, setLoading] = useState(false);
   const [globalError, setGlobalError] = useState(null);
   const [errorType, setErrorType] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -74,17 +81,47 @@ export function useMetaInsights(dateRangeDays, activeTab = "overview", selectedA
   const instagramAccountId = selectedAssets?.instagramId || selectedAssets?.instagramAccountId || null;
   const adAccountId = selectedAssets?.adAccountId || null;
 
-  // Reset cache on dateRangeDays, selected assets, or retryCount change
+  // Determine whether custom or preset date range is requested
+  const isCustomRange = Boolean(
+    typeof dateRangeInput === "object" &&
+    dateRangeInput !== null &&
+    dateRangeInput.isCustom &&
+    dateRangeInput.startDate &&
+    dateRangeInput.endDate
+  );
+
+  const customStartDate = isCustomRange ? dateRangeInput.startDate : null;
+  const customEndDate = isCustomRange ? dateRangeInput.endDate : null;
+
+  const presetDays = isCustomRange
+    ? null
+    : typeof dateRangeInput === "number"
+    ? dateRangeInput
+    : typeof dateRangeInput === "object" && dateRangeInput !== null && dateRangeInput.days
+    ? Number(dateRangeInput.days)
+    : dateRangeInput === "7d" || dateRangeInput === "7D" || dateRangeInput === 7
+    ? 7
+    : dateRangeInput === "28d" || dateRangeInput === "28D" || dateRangeInput === 28
+    ? 28
+    : dateRangeInput === "90d" || dateRangeInput === "90D" || dateRangeInput === "3m" || dateRangeInput === "3M" || dateRangeInput === 90
+    ? 90
+    : dateRangeInput === "24h" || dateRangeInput === "24H" || dateRangeInput === "today" || dateRangeInput === "yesterday" || dateRangeInput === 1
+    ? 1
+    : 30; // 30D is the default Meta preset, aligned with 30-day UI button
+
+  const dateRangeKey = isCustomRange
+    ? `custom_${customStartDate}_${customEndDate}`
+    : `preset_${presetDays}`;
+
+  // Reset cache on dateRangeKey, selected assets, or retryCount change
   useEffect(() => {
     cacheRef.current = {};
-  }, [dateRangeDays, pageId, instagramAccountId, adAccountId, retryCount]);
+  }, [dateRangeKey, pageId, instagramAccountId, adAccountId, retryCount]);
 
   useEffect(() => {
     let isMounted = true;
 
-    const META_TABS = ["overview", "facebook", "instagram", "ads"];
-    if (!META_TABS.includes(activeTab)) {
-      setLoading(false);
+    if (!isMetaTab) {
       return;
     }
 
@@ -149,10 +186,47 @@ export function useMetaInsights(dateRangeDays, activeTab = "overview", selectedA
         const adsLevelAssetParams = { limit: 50 };
         if (adAccountId) adsLevelAssetParams.adAccountId = adAccountId;
 
-        // Step 1: Ensure Overview & Capabilities are known
+        // Step 1: Compute reporting window date parameters
+        const timezone = cacheRef.current.timezone || "UTC";
+
+        let since;
+        let until;
+        let prevSince;
+        let prevUntil;
+
+        if (isCustomRange) {
+          since = customStartDate;
+          until = customEndDate;
+
+          const startMs = new Date(customStartDate).getTime();
+          const endMs = new Date(customEndDate).getTime();
+          const diffMs = Math.max(0, endMs - startMs);
+          const durationDays = Math.round(diffMs / (24 * 60 * 60 * 1000)) + 1;
+
+          const prevUntilDate = new Date(startMs - 24 * 60 * 60 * 1000);
+          const prevSinceDate = new Date(prevUntilDate.getTime() - (durationDays - 1) * 24 * 60 * 60 * 1000);
+          prevUntil = prevUntilDate.toISOString().split("T")[0];
+          prevSince = prevSinceDate.toISOString().split("T")[0];
+        } else {
+          const days = presetDays;
+          const now = new Date();
+          until = formatTimezoneDate(now, timezone);
+          const sinceDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+          since = formatTimezoneDate(sinceDate, timezone);
+
+          const prevUntilDate = new Date(sinceDate.getTime() - 24 * 60 * 60 * 1000);
+          const prevSinceDate = new Date(prevUntilDate.getTime() - days * 24 * 60 * 60 * 1000);
+          prevUntil = formatTimezoneDate(prevUntilDate, timezone);
+          prevSince = formatTimezoneDate(prevSinceDate, timezone);
+        }
+
+        const dateParams = { since, until };
+        const prevDateParams = { since: prevSince, until: prevUntil };
+
+        // Step 2: Ensure Overview & Capabilities are known for the active reporting window
         let overviewRes = cacheRef.current.overview;
         if (!overviewRes) {
-          overviewRes = await safeFetch(() => getMetaOverview(overviewAssetParams, options));
+          overviewRes = await safeFetch(() => getMetaOverview({ ...dateParams, ...overviewAssetParams }, options));
           if (!overviewRes.success) {
             if (overviewRes.is429) {
               setErrorType("rate_limit");
@@ -164,24 +238,20 @@ export function useMetaInsights(dateRangeDays, activeTab = "overview", selectedA
         }
 
         const capabilities = overviewRes.meta?.capabilities || {};
-        const timezone = overviewRes.meta?.dateRange?.timezone || "UTC";
-
-        // Calculate since and until based on Ad Account Timezone
-        const now = new Date();
-        const until = formatTimezoneDate(now, timezone);
-        const sinceDate = new Date(now.getTime() - dateRangeDays * 24 * 60 * 60 * 1000);
-        const since = formatTimezoneDate(sinceDate, timezone);
-        const dateParams = { since, until };
-
-        // Previous period calculation for comparison
-        const prevUntilDate = new Date(sinceDate.getTime() - 24 * 60 * 60 * 1000);
-        const prevSinceDate = new Date(prevUntilDate.getTime() - dateRangeDays * 24 * 60 * 60 * 1000);
-        const prevUntil = formatTimezoneDate(prevUntilDate, timezone);
-        const prevSince = formatTimezoneDate(prevSinceDate, timezone);
-        const prevDateParams = { since: prevSince, until: prevUntil };
+        const returnedTimezone = overviewRes.meta?.dateRange?.timezone;
+        if (returnedTimezone && returnedTimezone !== timezone && !isCustomRange) {
+          cacheRef.current.timezone = returnedTimezone;
+          const now = new Date();
+          dateParams.until = formatTimezoneDate(now, returnedTimezone);
+          const sinceDate = new Date(now.getTime() - presetDays * 24 * 60 * 60 * 1000);
+          dateParams.since = formatTimezoneDate(sinceDate, returnedTimezone);
+          since = dateParams.since;
+          until = dateParams.until;
+        }
 
         let prevOverviewRes = cacheRef.current.prevOverview;
         let socialRes = cacheRef.current.social;
+        let fbAnalyticsRes = cacheRef.current.fbAnalytics;
         let fbContentRes = cacheRef.current.fbContent;
         let igContentRes = cacheRef.current.igContent;
         let adsRes = cacheRef.current.ads;
@@ -191,7 +261,7 @@ export function useMetaInsights(dateRangeDays, activeTab = "overview", selectedA
         let prevSocialRes = cacheRef.current.prevSocial;
         let prevAdsRes = cacheRef.current.prevAds;
 
-        // Step 2: Tab-specific demand-driven dataset fetching
+        // Step 3: Tab-specific demand-driven dataset fetching
         if (activeTab === "overview") {
           if (!prevOverviewRes) {
             prevOverviewRes = await safeFetch(() => getMetaOverview({ ...prevDateParams, ...overviewAssetParams }, options));
@@ -219,9 +289,20 @@ export function useMetaInsights(dateRangeDays, activeTab = "overview", selectedA
           }
         } else if (activeTab === "facebook") {
           if (capabilities.social?.available) {
+            if (!fbAnalyticsRes) {
+              const fbParams = { ...dateParams };
+              if (pageId) fbParams.pageId = pageId;
+              if (!isCustomRange && presetDays) fbParams.datePreset = `${presetDays}d`;
+              fbAnalyticsRes = await safeFetch(() => getMetaFacebookAnalytics(fbParams, options));
+              cacheRef.current.fbAnalytics = fbAnalyticsRes;
+            }
             if (!socialRes) {
               socialRes = await safeFetch(() => getMetaSocialInsights({ ...dateParams, ...socialAssetParams }, options));
               cacheRef.current.social = socialRes;
+            }
+            if (!prevSocialRes) {
+              prevSocialRes = await safeFetch(() => getMetaSocialInsights({ ...prevDateParams, ...socialAssetParams }, options));
+              cacheRef.current.prevSocial = prevSocialRes;
             }
             if (!fbContentRes) {
               fbContentRes = await safeFetch(() => getMetaContentInsights({ ...dateParams, ...fbContentAssetParams }, options));
@@ -268,6 +349,7 @@ export function useMetaInsights(dateRangeDays, activeTab = "overview", selectedA
           setData({
             overview: overviewRes,
             social: socialRes?.success ? { data: socialRes.data, meta: socialRes.meta } : null,
+            fbAnalytics: fbAnalyticsRes?.success ? { data: fbAnalyticsRes.data, meta: fbAnalyticsRes.meta } : null,
             fbContent: { data: fbArray, meta: fbContentRes?.meta },
             igContent: { data: igArray, meta: igContentRes?.meta },
             ads: adsRes?.success ? { data: adsRes.data, meta: adsRes.meta } : null,
@@ -281,10 +363,20 @@ export function useMetaInsights(dateRangeDays, activeTab = "overview", selectedA
             prevSocial: prevSocialRes?.success ? { data: prevSocialRes.data } : null,
             prevAds: prevAdsRes?.success ? { data: prevAdsRes.data } : null,
             capabilities,
+            dateRange: {
+              since,
+              until,
+              prevSince,
+              prevUntil,
+              timezone: returnedTimezone || timezone,
+              isCustom: isCustomRange,
+              days: presetDays,
+            },
           });
 
           setErrors({
             social: socialRes?.error,
+            fbAnalytics: fbAnalyticsRes?.error,
             fbContent: fbContentRes?.error,
             igContent: igContentRes?.error,
             ads: adsRes?.error,
@@ -322,9 +414,22 @@ export function useMetaInsights(dateRangeDays, activeTab = "overview", selectedA
         abortControllerRef.current.abort();
       }
     };
-  }, [dateRangeDays, activeTab, pageId, instagramAccountId, adAccountId, retryCount]);
+  }, [dateRangeKey, isMetaTab, activeTab, pageId, instagramAccountId, adAccountId, retryCount, isCustomRange, customStartDate, customEndDate, presetDays]);
 
-  return { ...data, datasetErrors: errors, loading, error: globalError, errorType, retry };
+  return {
+    ...data,
+    dateRange: data.dateRange || {
+      since: isCustomRange ? customStartDate : null,
+      until: isCustomRange ? customEndDate : null,
+      isCustom: isCustomRange,
+      days: presetDays,
+    },
+    datasetErrors: errors,
+    loading: isMetaTab ? loading : false,
+    error: globalError,
+    errorType,
+    retry,
+  };
 }
 
 export function useMetaCampaigns(selectedAssets = {}) {
